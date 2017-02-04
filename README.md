@@ -3,4 +3,4 @@
 ### Assignment 0
 - Initial assignment to learn and refresh C programming skills.
 - Submitted solutions to a remote grading server
-  - More details here.
+  - More details (here.)[https://github.com/pedrampejman/os-grader-client]
