@@ -16,7 +16,59 @@ char PIPE[] = "|";
 char INPUT_REDIR[] = "<";
 char OUTPUT_REDIR[] = ">";
 
+// gets the line from file (just stdin for now)
+char *getLine(char *buff, FILE* input) {
+	int length;
+	
+	length = sizeof(buff);
+	fgets(buff, length, input);
+	return buff;
+}
+
+// parses the delimiter from the given string
+char **parseLine(char *buff, char *delim, char *returnbuff[]) {
+	int i = 0;
+	char *tempbuff[sizeof(buff)];
+	
+	tempbuff[i] = strtok(buff, delim);
+	while (tempbuff[i] != NULL) {
+		i++;
+		tempbuff[i] = strtok(NULL, delim);
+	}
+	returnbuff = tempbuff;
+	
+	return returnbuff;
+}
+
+
 int main() {
+	char command[1024];
+	char *pipedcommand[1024];
+	int index = 0;
+	
+	// get command from user
+	char *input = getLine(command, stdin);
+	
+	// remove the trailing newline
+	input[strcspn(input, "\n")] = 0;
+	
+	// parse the piped portions of the string	
+	// TODO move this to a separate function??
+	pipedcommand[index] = strtok(input, PIPE);
+	while (pipedcommand[index] != NULL) {
+		index++;
+		pipedcommand[index] = strtok(NULL, PIPE);
+	}
+	printf("%s\n", pipedcommand[0]);
+/*
+	while (pipedcommand[test] != NULL) {
+		printf("%s\n", pipedcommand[test]);
+		test++;
+	}	
+*/
+	//
 	exit(0);
 }
+
+
 
