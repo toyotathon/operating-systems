@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdbool.h>
 #include <unistd.h>
 #include <string.h>
 #include <assert.h>
@@ -26,29 +27,36 @@ char *getLine(char *buff, FILE* input) {
 }
 
 /* parses the delimiter from the given string */
-char **parseLine(char *str, const char *delim, char **final) {
-	char **result 	= 0;
-	int str_len 	= strlen(str);
-	int count 		= 0;
-	int i 			= 0;
-	
-	if (strcmp(str, delim) == 0) {
-		count++;
-	}
-	result = malloc(sizeof(char*) * count);
-	
-	result[i] = strtok(str, delim);
-	while (result[i] != NULL) {
-		i++;
-		result[i] = strtok(NULL, delim);
-	}
-	return result;
-}
+/* TODO might not use this?? */
+char **parseLine(char *buff, const char *delim) {}
 
+/* check command input for errors, or exit command */
+bool checkErrors(char *buff) {
+	int length = strlen(buff);
+	if (strcmp(buff, "exit") == 0) {	
+		return false;
+	}
+	/* iterate through input, see if any chars are invalid */
+	int i;
+	int j;
+	bool valid = false;
+	for (i=0; i<length; i++) {
+		for (j=0; j < 71; j++) {
+			if (buff[i] == LEGAL_CHARS[j]) {	
+				valid = true;
+			}
+		}
+		if (!valid) {
+			printf("invalid input\n");
+			return false;
+		}
+	}	
+	return true;
+}
 
 int main() {
 	char command[1024];
-	char **piped;
+	char *parsed[1024];
 	
 	// get command from user
 	char *input = getLine(command, stdin);
@@ -56,13 +64,10 @@ int main() {
 	// remove the trailing newline
 	input[strcspn(input, "\n")] = 0;
 	
-	// parse the piped portions of the string
-	piped = parseLine(input, PIPE);
-	int temp = sizeof(piped);
-	printf("%d\n", temp);
-	printf("%s\n", piped[0]);
-	printf("%s\n", piped[1]);
-
+	// check the input for any errors
+	bool errors = checkErrors(input);
+		
+	// parse the piped portions of the string	
 	return 0;	
 }
 
