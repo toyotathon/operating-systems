@@ -1,8 +1,8 @@
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
+#include <assert.h>
 
 /* array that includes all legal characters in the shell */
 char LEGAL_CHARS[71] = {
@@ -12,11 +12,11 @@ char LEGAL_CHARS[71] = {
 	'-','.','_'
 };
 
-char PIPE[] = "|";
-char INPUT_REDIR[] = "<";
-char OUTPUT_REDIR[] = ">";
+const char PIPE[] 				= "|";
+const char INPUT_REDIR[] 		= "<";
+const char OUTPUT_REDIR[] 		= ">";
 
-// gets the line from file (just stdin for now)
+/* gets the line from file (just stdin for now) */
 char *getLine(char *buff, FILE* input) {
 	int length;
 	
@@ -25,26 +25,30 @@ char *getLine(char *buff, FILE* input) {
 	return buff;
 }
 
-// parses the delimiter from the given string
-char **parseLine(char *buff, char *delim, char *returnbuff[]) {
-	int i = 0;
-	char *tempbuff[sizeof(buff)];
+/* parses the delimiter from the given string */
+char **parseLine(char *str, const char *delim, char **final) {
+	char **result 	= 0;
+	int str_len 	= strlen(str);
+	int count 		= 0;
+	int i 			= 0;
 	
-	tempbuff[i] = strtok(buff, delim);
-	while (tempbuff[i] != NULL) {
-		i++;
-		tempbuff[i] = strtok(NULL, delim);
+	if (strcmp(str, delim) == 0) {
+		count++;
 	}
-	returnbuff = tempbuff;
+	result = malloc(sizeof(char*) * count);
 	
-	return returnbuff;
+	result[i] = strtok(str, delim);
+	while (result[i] != NULL) {
+		i++;
+		result[i] = strtok(NULL, delim);
+	}
+	return result;
 }
 
 
 int main() {
 	char command[1024];
-	char *pipedcommand[1024];
-	int index = 0;
+	char **piped;
 	
 	// get command from user
 	char *input = getLine(command, stdin);
@@ -52,22 +56,14 @@ int main() {
 	// remove the trailing newline
 	input[strcspn(input, "\n")] = 0;
 	
-	// parse the piped portions of the string	
-	// TODO move this to a separate function??
-	pipedcommand[index] = strtok(input, PIPE);
-	while (pipedcommand[index] != NULL) {
-		index++;
-		pipedcommand[index] = strtok(NULL, PIPE);
-	}
-	printf("%s\n", pipedcommand[0]);
-/*
-	while (pipedcommand[test] != NULL) {
-		printf("%s\n", pipedcommand[test]);
-		test++;
-	}	
-*/
-	//
-	exit(0);
+	// parse the piped portions of the string
+	piped = parseLine(input, PIPE);
+	int temp = sizeof(piped);
+	printf("%d\n", temp);
+	printf("%s\n", piped[0]);
+	printf("%s\n", piped[1]);
+
+	return 0;	
 }
 
 
