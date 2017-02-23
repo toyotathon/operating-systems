@@ -130,16 +130,3 @@ int main() {
 	
 	return 0;
 }
-
-
-
-/*
-if (i == 0 && (strcmp(strArray[i], ">") == 0 || strcmp(strArray[i], "<") == 0 || strcmp(strArray[i], "|") == 0)) {
-					execute = false;
-					printf("invalid input\n");
-					
-				}
-
-
-*/
-
