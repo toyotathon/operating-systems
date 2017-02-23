@@ -87,7 +87,7 @@ bool checkPipes(char *parsed[], int commandnum) {
 * 	- (add more)
 */
 /* TODO */
-bool checkCommandErrors(char *buff) {}
+//bool checkCommandErrors(char *buff) {}
 
 int main() {
 	char input[1024];
@@ -114,7 +114,7 @@ int main() {
 	commandnum = 0;
 	saveptr = input;
 	
-	while (iter = strtok_r(saveptr, PIPE, &saveptr)) {
+	while ( (iter = strtok_r(saveptr, PIPE, &saveptr)) ) {
 		parsed[commandnum] = iter;
 		commandnum++;
 	}
