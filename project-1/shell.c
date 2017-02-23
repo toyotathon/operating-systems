@@ -13,25 +13,29 @@ char LEGAL_CHARS[71] = {
 	'-','.','_'
 };
 
+const char SPACE[]				= " ";
 const char PIPE[] 				= "|";
 const char INPUT_REDIR[] 		= "<";
 const char OUTPUT_REDIR[] 		= ">";
 
-/* gets the line from file (just stdin for now) */
-char *getLine(char *buff, FILE* input) {
-	int length;
-	
-	length = sizeof(buff);
-	fgets(buff, length, input);
-	return buff;
-}
+/*TODO create a struct that holds all the necessary things??
+* - char **: commands
+* - int: number of commands
+* - int: number of pipes
+* - int: number of redirections
+*/
+typedef struct command{
+	int numcommands;
+	int pipes;
+	int redirections;
+	char *command[];
+} command;
 
-/* parses the delimiter from the given string */
-/* TODO might not use this?? */
-char **parseLine(char *buff, const char *delim) {}
+/* parses the given string by the spaces*/
+void parseLine(char *buff, char **returnbuff) {}
 
 /* check command input for errors, or exit command */
-bool checkErrors(char *buff) {
+bool checkInputErrors(char *buff) {
 	int length = strlen(buff);
 	if (strcmp(buff, "exit") == 0) {	
 		return false;
@@ -54,22 +58,88 @@ bool checkErrors(char *buff) {
 	return true;
 }
 
+/* check if input has any incorrect pipe stuff */
+bool checkPipes(char *parsed[], int commandnum) {
+	int i;
+	for (i=0; i<commandnum; i++) {
+		char *currstring = parsed[i];
+		if (i == 0) {	
+			int length = strlen(currstring);
+			char lastchar = currstring[length-1];
+			if (lastchar != ' ') {
+				return false;
+			}
+		} 
+		else {
+			char firstchar = currstring[0];
+			if (firstchar != ' ') {
+				return false;
+			}	
+		}
+	}
+	return true;
+} 
+
+/* check errors in the command (after the input is validated and parsed) 
+* things to check for:
+* 	- redirection tokens used in wrong place
+* 	- only one of each redirect token per command
+* 	- (add more)
+*/
+/* TODO */
+bool checkCommandErrors(char *buff) {}
+
 int main() {
-	char command[1024];
+	char input[1024];
+	bool errors;
 	char *parsed[1024];
-	
+	int commandnum;
+	char *saveptr;
+	char *iter;
+		
 	// get command from user
-	char *input = getLine(command, stdin);
+	fgets(input, 1024, stdin);
 	
 	// remove the trailing newline
 	input[strcspn(input, "\n")] = 0;
 	
 	// check the input for any errors
-	bool errors = checkErrors(input);
-		
-	// parse the piped portions of the string	
-	return 0;	
+	errors = checkInputErrors(input);
+	if (!errors) {
+		exit(0);
+	}
+	
+	/* parse the piped portions of the string */
+	// TODO move this to parseLine function??
+	commandnum = 0;
+	saveptr = input;
+	
+	while (iter = strtok_r(saveptr, PIPE, &saveptr)) {
+		parsed[commandnum] = iter;
+		commandnum++;
+	}
+	
+	/* check to see if pipe is spaced correctly */
+	errors = checkPipes(parsed, commandnum);	
+	if (!errors) {
+		printf("invalid input\n");
+		exit(0);
+	}
+	
+	/* TODO check commands for legality */
+	
+	return 0;
 }
 
 
+
+/*
+if (i == 0 && (strcmp(strArray[i], ">") == 0 || strcmp(strArray[i], "<") == 0 || strcmp(strArray[i], "|") == 0)) {
+					execute = false;
+					printf("invalid input\n");
+					
+				}
+
+
+*/
 
