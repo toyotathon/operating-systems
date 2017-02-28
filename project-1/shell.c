@@ -19,7 +19,7 @@ const char PIPE[] 				= "|";
 const char INPUT_REDIR[] 		= "<";
 const char OUTPUT_REDIR[] 		= ">";
 
-/*TODO change this as needed
+/* TODO change this as needed
 * - int: length of command 
 	- get this when parsing the command
 * - int: number of command (i.e. order it is executed in)
@@ -41,7 +41,9 @@ typedef struct commandstruct {
 
 /* initialize a new command struct */
 command *newCommand(int size, int number) {
-	size_t newsize = (size_t) size;
+	size_t newsize; 
+
+	newsize = (size_t) size;
 	command *newcommand = calloc(1, sizeof(command));
 
 	newcommand->length 	= size;
@@ -60,7 +62,10 @@ void parseLine(char *buff, char **returnbuff) {}
 /* check command input for errors, returns false if invalid*/
 bool checkInputErrors(char *buff) {
 	int length;
-	
+	int i;
+	int j;
+	bool valid;
+
 	length = strlen(buff);
 
 	/* if exit is the only thing entered by user, exit the program */
@@ -69,9 +74,6 @@ bool checkInputErrors(char *buff) {
 	}
 
 	/* iterate through input, see if any chars are invalid */
-	int i;
-	int j;
-	bool valid;
 	for (i=0; i<length; i++) {
 		valid = false;
 		for (j=0; j < 70; j++) {
@@ -129,6 +131,8 @@ bool checkCommandErrors(command *totalcommands[], int commandnum) {
 	int length;
 	bool legal;
 	char* commandtoken;
+	
+	legal = true;
 
 	for (i=0; i<commandnum; i++) {			
 		current = totalcommands[i];
@@ -138,37 +142,72 @@ bool checkCommandErrors(command *totalcommands[], int commandnum) {
 			commandtoken = current->command[j];
 			
 			/* counting the number of file redirects */
-			if (strstr(commandtoken, INPUT_REDIR) != NULL) {
+			if (strcmp(commandtoken, INPUT_REDIR) == 0) {
 				current->inputs += 1;
 			}
 
-			if (strstr(commandtoken, OUTPUT_REDIR) != NULL) {
+			if (strcmp(commandtoken, OUTPUT_REDIR) == 0) {
 				current->outputs += 1;
 			}
 			
 			/* checking for errors in the user input */
 			if (strstr(commandtoken, "<<") != NULL) {
 				//syntax error
-				printf("invalid input 3\n");
 				legal = false;
 			}
 
 			if (strstr(commandtoken, ">>") != NULL) {
-				printf("invalid input 3\n");	
 				legal = false;
 			}		
 		}
 
+		// check if redirs are placed in the correct order
+		if ((current->inputs == 1) && (current->outputs ==1)) {
+			int ii;
+			int inputindex = 0;
+			int outputindex = 0;
+
+			// get index of input redir
+			for (ii=0; ii<length; ii++) {
+				commandtoken = current->command[ii];
+				if (strcmp(commandtoken, INPUT_REDIR) != 0) {
+					inputindex++;
+				} 
+				else {
+					break;
+				}
+			}
+			
+			// get index of output redir
+			for (ii=0; ii<length; ii++) {
+				commandtoken = current->command[ii];	
+				if (strcmp(commandtoken, OUTPUT_REDIR) != 0) {
+					outputindex++;
+				} 
+				else {
+					break;
+				}
+			}
+			
+			if (inputindex > outputindex) {
+				legal = false;
+			}	
+		}
+
 		if (current->inputs > 1) {
-			printf("invalid input 3\n");
 			legal = false;
 		}
-		
-		else if (current->outputs > 1) {
-			printf("invalid input 3\n");
+			
+		if (current->outputs > 1) {
 			legal = false;
-		} else {
-			legal = true;
+		} 
+
+		// output redir cannot be followed by a pipe operator
+		if (current->outputs == 1) {
+			int currnumber = commandnum - 1;
+			if (current->number !=  currnumber) {
+				legal = false;
+			}
 		}
 	}
 	return legal;
@@ -263,8 +302,11 @@ int main() {
 	commanderrors = checkCommandErrors(totalcommands, commandnum);
 	
 	if (!commanderrors) {
+		printf("invalid input 3\n");
 		exit(0);	
 	}
+
+	/* interpret the commands from the user */
 
 	return 0;
 }
