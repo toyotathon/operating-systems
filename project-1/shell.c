@@ -40,6 +40,20 @@ typedef struct commandstruct {
 	char **command;
 } command;
 
+/* initialize a new command struct */
+command *newCommand(int size, int number) {
+	size_t newsize = (size_t) size;
+	command *newcommand = calloc(1, sizeof(command));
+
+	newcommand->length = size;
+	newcommand->number = number;
+	newcommand->inputs = 0;
+	newcommand->outputs = 0;
+	newcommand->command = malloc(newsize * sizeof(*(newcommand->command)));
+
+	return newcommand;	
+}
+
 
 /* parses the given string by the spaces*/
 void parseLine(char *buff, char **returnbuff) {}
@@ -152,14 +166,6 @@ int main() {
 		printf("invalid input 2\n");
 		exit(0);
 	}	
-
-	/* CURRENT IDEA FOR PARSING PARSED:
-	* - get the command string
-	* - get the length of the string
-	* - parse the string by space
-	* - create a new command struct
-	* - add this to an array 
-	*/
 	
 	/* CURRENT COMMAND STRUCT:
 	* - int: length of command 
@@ -171,11 +177,11 @@ int main() {
 		- more than one input redir, throw error
 	* - int: number of output redirections
 		- more than one output redir, throw error
-	* - char *: command 
+	* - char **: command 
 		- space parsed
 	*/
 
-	command totalcommands[1024];	
+	command *totalcommands[1024];	
 	int i;
 	for (i=0; i<commandnum; i++) {
 		char *currstring;
@@ -192,25 +198,14 @@ int main() {
 			commandindex++;	
 		}
 		
+		command *newcommand = newCommand(commandindex, i);
+	
 		int j;
 		for (j=0; j<commandindex; j++) {
-			printf("[%d] => '%s'\n", j, commands[j]);
-		}
-		printf("\n");
-		
-		totalcommands[i].length = commandindex;
-		totalcommands[i].number = i;
-		totalcommands[i].inputs = 0;
-		totalcommands[i].outputs = 0;
-		totalcommands[i].command = commands;
-	}
-	
-	command curr = totalcommands[0];
-	int length = curr.length;
-	printf("%d\n", length);
-	int j;
-	for (j=0; j<length; j++) {
-		printf("%s\n", curr.command[j]);
+			newcommand->command[j] = strdup(commands[j]);
+		}	
+		totalcommands[i] = newcommand;
+
 	}
 	
 	return 0;
