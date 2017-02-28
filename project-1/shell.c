@@ -4,6 +4,11 @@
 #include <unistd.h>
 #include <string.h>
 #include <assert.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <sys/wait.h>
+#include <fcntl.h>
+
 
 /* array that includes all legal characters in the shell */
 char LEGAL_CHARS[70] = {
@@ -38,6 +43,8 @@ typedef struct commandstruct {
 	int number;
 	int inputs;
 	int outputs;
+	int in_index;
+	int out_index;
 	char **command;
 } command;
 
@@ -48,13 +55,58 @@ command *newCommand(int size, int number) {
 	newsize = (size_t) size;
 	command *newcommand = calloc(1, sizeof(command));
 
-	newcommand->length 	= size;
-	newcommand->number 	= number;
-	newcommand->inputs 	= 0;
-	newcommand->outputs = 0;
-	newcommand->command = malloc(newsize * sizeof(*(newcommand->command)));
+	newcommand->length 		= size;
+	newcommand->number 		= number;
+	newcommand->inputs 		= 0;
+	newcommand->outputs 	= 0;
+	newcommand->in_index 	= 0; 
+	newcommand->out_index 	= 0;
+	newcommand->command 	= malloc(newsize * sizeof(*(newcommand->command)));
 
 	return newcommand;	
+}
+
+/* get indices of redirection tokens */
+void getRedirIndices(command *totalcommands[], int commandnum) {
+	int i;
+	int j;
+	int inputindex;
+	int outputindex;
+	int length;
+	command *current;
+	char* commandtoken;
+
+	for (i=0; i<commandnum; i++) {			
+		current = totalcommands[i];
+		length = current->length;
+
+		inputindex = 0;
+		outputindex = 0;
+
+		for (j=0; j<length; j++) {
+			commandtoken = current->command[j];
+	
+			if (strcmp(commandtoken, INPUT_REDIR) != 0) {
+				inputindex++;
+			} 
+			else {
+				current->in_index = inputindex;
+				break;
+			}
+		}	
+	
+		// get index of output redir
+		for (j=0; j<length; j++) {
+			commandtoken = current->command[j];	
+			if (strcmp(commandtoken, OUTPUT_REDIR) != 0) {
+				outputindex++;
+			} 
+			else {
+				current->out_index = outputindex;
+				break;
+			}
+		}
+	}
 }
 
 /* check command input for errors, returns false if invalid*/
@@ -140,6 +192,9 @@ bool checkCommandErrors(command *totalcommands[], int commandnum) {
 	int length;
 	bool legal;
 	char* commandtoken;
+
+	/* get the redirect indices needed for this */
+	getRedirIndices(totalcommands, commandnum);
 	
 	legal = true;
 
@@ -171,34 +226,8 @@ bool checkCommandErrors(command *totalcommands[], int commandnum) {
 		}
 
 		// check if redirs are placed in the correct order
-		if ((current->inputs == 1) && (current->outputs ==1)) {
-			int ii;
-			int inputindex = 0;
-			int outputindex = 0;
-
-			// get index of input redir
-			for (ii=0; ii<length; ii++) {
-				commandtoken = current->command[ii];
-				if (strcmp(commandtoken, INPUT_REDIR) != 0) {
-					inputindex++;
-				} 
-				else {
-					break;
-				}
-			}
-			
-			// get index of output redir
-			for (ii=0; ii<length; ii++) {
-				commandtoken = current->command[ii];	
-				if (strcmp(commandtoken, OUTPUT_REDIR) != 0) {
-					outputindex++;
-				} 
-				else {
-					break;
-				}
-			}
-			
-			if (inputindex > outputindex) {
+		if ((current->inputs == 1) && (current->outputs ==1)) {			
+			if ((current->in_index) > (current->out_index)) {
 				legal = false;
 			}	
 		}
@@ -260,7 +289,7 @@ int main() {
 	int commandnum;
 	char *saveptr;
 	char *iter;
-	bool pipe;
+	bool pipepresent;
 	command *totalcommands[1024];
 	bool commanderrors;
 
@@ -278,10 +307,10 @@ int main() {
 
 	/* check if there are pipes in the input */
 	if (strchr(input, '|') != NULL) {
-		pipe = true;
+		pipepresent = true;
 	} 
 	else {
-		pipe = false;
+		pipepresent = false;
 	}
 		
 
@@ -294,7 +323,7 @@ int main() {
 		commandnum++;
 	}
 	
-	if (pipe) {
+	if (pipepresent) {
 		/* check to see if pipe is spaced correctly */
 	 	errors = checkPipes(parsed, commandnum);
 	}
@@ -317,7 +346,100 @@ int main() {
 	}
 
 	/* interpret the commands from the user */
+	// # of forks = commandnum
+	// # of pipes = commandnum - 1
+	int pipenumber;
+	command *current;
+	int out_file;
+	char *out_name;
+	int in_file;
+	char *in_name;
+	bool read;
+	bool write;
+	bool rw;
+	int r_index = -2;
+	int w_index = -1;
+	int i;
+	int j;
+
+	pipenumber = commandnum - 1;
+
+	read = false;
+	write = false;
+	rw = false;
 	
+	int fd[2*pipenumber];
+
+	/* set up the pipes necessary */	
+	for (i=0; i<pipenumber; i++) {
+		pipe(fd + 2*i);
+	}
+	
+	for (j=0; j<commandnum; j++) {
+		/* get the current command to be executed */
+		current = totalcommands[j];
+
+		if (current->inputs == 1) {
+			int in_index = current->in_index;
+			in_name = current->command[in_index + 1];
+			in_file = open(in_name, O_CREAT | O_RDONLY, S_IRWXU);
+			current->command[in_index] = NULL;
+			current->command[in_index + 1] = NULL;
+		}
+		
+		if (current->outputs == 1) {
+			int out_index = current->out_index;
+			out_name = current->command[out_index + 1];
+			out_file = open(out_name, O_WRONLY | O_CREAT | O_TRUNC, S_IRWXU);
+			current->command[out_index] = NULL;
+			current->command[out_index + 1] = NULL;
+
+		}
+
+		if (current->number == pipenumber) {
+			read = true;
+			r_index += 2;
+		}
+
+		if ((pipenumber > 0) && current->number == 0) {
+			write = true;
+			w_index += 2;
+		}
+
+		if (current->number > 1) {
+			rw = true;
+			r_index += 2;
+			w_index += 2;
+		}
+		
+		int pid = fork();
+
+		if (pid == 0) { /* child process */
+
+			if (current->inputs == 1) {
+				dup2(in_file, 0);
+			}
+
+			if (current->outputs == 1) {
+				dup2(out_file, 1);
+			}
+
+
+			if (pipenumber > 0) {
+				/* error messages will be here */
+
+				int k;
+				int closingpipes = 2*pipenumber;
+				for (k=0; k<closingpipes; k++) {
+					close(fd[k]);
+				}
+			}
+			execvp(current->command[0], current->command);		
+			printf("invalid input in child process\n");
+			exit(0);
+		}
+	
+	}
 
 	return 0;
 }
