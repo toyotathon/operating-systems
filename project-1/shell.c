@@ -359,6 +359,7 @@ int main() {
 	bool rw;
 	int r_index = -2;
 	int w_index = -1;
+	int status;
 	int i;
 	int j;
 
@@ -426,8 +427,30 @@ int main() {
 
 
 			if (pipenumber > 0) {
-				/* error messages will be here */
+			
+				if (read) {	
+					if (dup2(fd[r_index], 0) == -1) {
+						perror("ERROR: error occured reading");
+						// need to terminate process
+						_exit(1);
+					} 
+				}	
 
+				else if (write) {
+					if (dup2(fd[w_index], 1) == -1) {
+						perror("ERROR: error occured when writing");
+					}
+				}
+			
+				else if (rw) {
+					if (dup2(fd[r_index], 0) == -1) {
+						perror("ERROR: error between reading");
+					}
+					if (dup2(fd[w_index], 1) == -1) {
+						perror("ERROR: error between writing");
+					}
+				}
+					
 				int k;
 				int closingpipes = 2*pipenumber;
 				for (k=0; k<closingpipes; k++) {
@@ -440,6 +463,21 @@ int main() {
 		}
 	
 	}
+	// wait for remaining processes
+	int l;
+	for (l=0; l < (pipenumber+1); l++) {
+		wait(&status);
+		fprintf(stderr, "%d\n", WEXITSTATUS(status));
+	}
+	
+	// close all pipes	
+	for (l=0; l<2*pipenumber; l++) {
+		close(fd[l]);
+	}
+	
+	// close all used files
+	close(out_file);
+	close(in_file);
 
 	return 0;
 }
