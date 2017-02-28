@@ -44,9 +44,9 @@ command *newCommand(int size, int number) {
 	size_t newsize = (size_t) size;
 	command *newcommand = calloc(1, sizeof(command));
 
-	newcommand->length = size;
-	newcommand->number = number;
-	newcommand->inputs = 0;
+	newcommand->length 	= size;
+	newcommand->number 	= number;
+	newcommand->inputs 	= 0;
 	newcommand->outputs = 0;
 	newcommand->command = malloc(newsize * sizeof(*(newcommand->command)));
 
@@ -59,10 +59,15 @@ void parseLine(char *buff, char **returnbuff) {}
 
 /* check command input for errors, returns false if invalid*/
 bool checkInputErrors(char *buff) {
-	int length = strlen(buff);
+	int length;
+	
+	length = strlen(buff);
+
+	/* if exit is the only thing entered by user, exit the program */
 	if (strcmp(buff, "exit") == 0) {	
 		return false;
 	}
+
 	/* iterate through input, see if any chars are invalid */
 	int i;
 	int j;
@@ -83,21 +88,25 @@ bool checkInputErrors(char *buff) {
 	return valid;
 }
 
-
 /* check if input has any incorrect pipe stuff */
 bool checkPipes(char *parsed[], int commandnum) {
 	int i;
+	char *currstring;
+	int length;
+	char lastchar;
+	char firstchar;
+
 	for (i=0; i<commandnum; i++) {
-		char *currstring = parsed[i];
+		currstring = parsed[i];
 		if (i == 0) {	
-			int length = strlen(currstring);
-			char lastchar = currstring[length-1];
+			length = strlen(currstring);
+			lastchar = currstring[length-1];
 			if (lastchar != ' ') {
 				return false;
 			}
 		} 
 		else {
-			char firstchar = currstring[0];
+			firstchar = currstring[0];
 			if (firstchar != ' ') {
 				return false;
 			}	
@@ -115,17 +124,18 @@ bool checkPipes(char *parsed[], int commandnum) {
 /* TODO */
 bool checkCommandErrors(command *totalcommands[], int commandnum) {
 	int i;
+	int j;
 	command *current;
 	int length;
 	bool legal;
+	char* commandtoken;
 
 	for (i=0; i<commandnum; i++) {			
 		current = totalcommands[i];
 		length = current->length;
 		
-		int j;
 		for (j=0; j<length; j++) {
-			char* commandtoken = current->command[j];
+			commandtoken = current->command[j];
 			
 			/* counting the number of file redirects */
 			if (strstr(commandtoken, INPUT_REDIR) != NULL) {
@@ -167,12 +177,15 @@ bool checkCommandErrors(command *totalcommands[], int commandnum) {
 /* takes in the parsed commands, separates them into structs */
 void getCommands(command *totalcommands[], char *parsed[], int commandnum) {
 	int i;
+	int j;
+	char *currstring;
+	char *iter1;
+	char *saveptr1;
+	char *commands[1024];
+	int commandindex;
+
 	for (i=0; i<commandnum; i++) {
-		char *currstring;
-		char *iter1;
-		char *saveptr1;
-		char *commands[1024];
-		int commandindex = 0;
+		commandindex = 0;
 		
 		currstring = parsed[i];
 		saveptr1 = currstring;
@@ -183,8 +196,7 @@ void getCommands(command *totalcommands[], char *parsed[], int commandnum) {
 		}
 		
 		command *newcommand = newCommand(commandindex, i);
-	
-		int j;
+
 		for (j=0; j<commandindex; j++) {
 			newcommand->command[j] = strdup(commands[j]);
 		}	
@@ -202,8 +214,8 @@ int main() {
 	char *iter;
 	bool pipe;
 	command *totalcommands[1024];
+	bool commanderrors;
 
-		
 	// get command from user
 	fgets(input, 1024, stdin);
 	
@@ -248,7 +260,7 @@ int main() {
 	getCommands(totalcommands, parsed, commandnum);
 
 	/* check commands for legality */
-	bool commanderrors = checkCommandErrors(totalcommands, commandnum);
+	commanderrors = checkCommandErrors(totalcommands, commandnum);
 	
 	if (!commanderrors) {
 		exit(0);	
