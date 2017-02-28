@@ -120,13 +120,12 @@ bool checkInputErrors(char *buff) {
 
 	/* if exit is the only thing entered by user, exit the program */
 	if (strcmp(buff, "exit") == 0) {	
-		return false;
+		exit(0);
 	}
 
 	/* make sure 1st input char is not a symbol/whitespace */
 	for (i=0; i<8; i++) {
 		if (buff[0] == SYMBOLS[i]) {
-			printf("invalid input\n");
 			return false;
 		}
 	}
@@ -141,7 +140,6 @@ bool checkInputErrors(char *buff) {
 			}
 		}
 		if (valid == false) {
-			printf("invalid input 1\n");
 			break;
 		}
 	}
@@ -282,72 +280,7 @@ void getCommands(command *totalcommands[], char *parsed[], int commandnum) {
 
 }
 
-int main() {
-	char input[1024];
-	bool errors;
-	char *parsed[1024];
-	int commandnum;
-	char *saveptr;
-	char *iter;
-	bool pipepresent;
-	command *totalcommands[1024];
-	bool commanderrors;
-
-	/* get command from user */
-	fgets(input, 1024, stdin);
-	
-	/* remove the trailing newline */
-	input[strcspn(input, "\n")] = 0;
-	
-	/* check the input for any errors */
-	errors = checkInputErrors(input);
-	if (!errors) {
-		exit(0);
-	}
-
-	/* check if there are pipes in the input */
-	if (strchr(input, '|') != NULL) {
-		pipepresent = true;
-	} 
-	else {
-		pipepresent = false;
-	}
-		
-
-	commandnum = 0;
-	saveptr = input;
-
-	/* parse the piped portions of the string */
-	while ( (iter = strtok_r(saveptr, PIPE, &saveptr)) ) {
-		parsed[commandnum] = iter;
-		commandnum++;
-	}
-	
-	if (pipepresent) {
-		/* check to see if pipe is spaced correctly */
-	 	errors = checkPipes(parsed, commandnum);
-	}
-	
-	/* if piping errors are found */
-	if (!errors) {
-		printf("invalid input 2\n");
-		exit(0);
-	}
-	
-	/* parse the given command, separate into separate structs */
-	getCommands(totalcommands, parsed, commandnum);
-
-	/* check commands for legality */
-	commanderrors = checkCommandErrors(totalcommands, commandnum);
-	
-	if (!commanderrors) {
-		printf("invalid input 3\n");
-		exit(0);	
-	}
-
-	/* interpret the commands from the user */
-	// # of forks = commandnum
-	// # of pipes = commandnum - 1
+void interpretCommands(command *totalcommands[], int commandnum ) {
 	int pipenumber;
 	command *current;
 	int out_file;
@@ -357,6 +290,8 @@ int main() {
 	bool read;
 	bool write;
 	bool rw;
+	bool input;
+	bool output;
 	int r_index = -2;
 	int w_index = -1;
 	int status;
@@ -381,6 +316,7 @@ int main() {
 		current = totalcommands[j];
 
 		if (current->inputs == 1) {
+			input = true;
 			int in_index = current->in_index;
 			in_name = current->command[in_index + 1];
 			in_file = open(in_name, O_CREAT | O_RDONLY, S_IRWXU);
@@ -389,6 +325,7 @@ int main() {
 		}
 		
 		if (current->outputs == 1) {
+			output = true;
 			int out_index = current->out_index;
 			out_name = current->command[out_index + 1];
 			out_file = open(out_name, O_WRONLY | O_CREAT | O_TRUNC, S_IRWXU);
@@ -463,21 +400,105 @@ int main() {
 		}
 	
 	}
-	// wait for remaining processes
+	
+	// close all pipes	
 	int l;
+	for (l=0; l<2*pipenumber; l++) {
+		close(fd[l]);
+	}
+
+
+	// wait for remaining processes
 	for (l=0; l < (pipenumber+1); l++) {
 		wait(&status);
 		fprintf(stderr, "%d\n", WEXITSTATUS(status));
 	}
 	
-	// close all pipes	
-	for (l=0; l<2*pipenumber; l++) {
-		close(fd[l]);
-	}
-	
 	// close all used files
-	close(out_file);
-	close(in_file);
+	if (output) {
+		close(out_file);
+	}	
+	
+	if (input) {
+		close(in_file);
+	}
+}
 
+/* main method - invokes all necessary shell methods */
+int main() {
+	char input[1024];
+	char *saveptr;
+	char *iter;
+	char *parsed[1024];
+	bool errors;
+	bool pipepresent;
+	bool commanderrors;
+	bool execute;
+	int commandnum;
+	command *totalcommands[1024];
+
+	while (1) {
+
+		execute = true;
+
+		/* get command from user */
+		fgets(input, 1024, stdin);
+		
+		/* remove the trailing newline */
+		input[strcspn(input, "\n")] = 0;
+		
+		/* check the input for any errors */
+		errors = checkInputErrors(input);
+		if (!errors) {
+			printf("ERROR: incorrect syntax in command\n");
+		}
+
+		/* check if there are pipes in the input */
+		if (strchr(input, '|') != NULL) {
+			pipepresent = true;
+		} 
+		else {
+			pipepresent = false;
+		}
+			
+
+		commandnum = 0;
+		saveptr = input;
+
+		/* parse the piped portions of the string */
+		while ( (iter = strtok_r(saveptr, PIPE, &saveptr)) ) {
+			parsed[commandnum] = iter;
+			commandnum++;
+		}
+		
+		if (pipepresent) {
+			/* check to see if pipe is spaced correctly */
+			errors = checkPipes(parsed, commandnum);
+		}
+		
+		/* if piping errors are found */
+		if (!errors) {
+			printf("ERROR: cannot interpret command\n");
+		}
+		
+		/* parse the given command, separate into separate structs */
+		getCommands(totalcommands, parsed, commandnum);
+
+		/* check commands for legality */
+		commanderrors = checkCommandErrors(totalcommands, commandnum);
+		
+		if (!commanderrors) {
+			printf("ERROR: command syntax is incorrect\n");	
+		}
+
+		if (!errors || !commanderrors) {
+			execute = false;
+		}
+
+		/* interpret the commands from the user */
+		if (execute) {
+			interpretCommands(totalcommands, commandnum);
+		}
+	}
 	return 0;
 }
