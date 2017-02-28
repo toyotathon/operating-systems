@@ -13,6 +13,8 @@ char LEGAL_CHARS[70] = {
 	'-','.','_','/', '|','<','>', ' '
 };
 
+char SYMBOLS[8] = {'-','.','_','/', '|','<','>', ' '};
+
 /* legal tokens for the shell */
 const char SPACE[]				= " ";
 const char PIPE[] 				= "|";
@@ -55,10 +57,6 @@ command *newCommand(int size, int number) {
 	return newcommand;	
 }
 
-
-/* TODO parses the given string by the spaces*/
-void parseLine(char *buff, char **returnbuff) {}
-
 /* check command input for errors, returns false if invalid*/
 bool checkInputErrors(char *buff) {
 	int length;
@@ -73,6 +71,14 @@ bool checkInputErrors(char *buff) {
 		return false;
 	}
 
+	/* make sure 1st input char is not a symbol/whitespace */
+	for (i=0; i<8; i++) {
+		if (buff[0] == SYMBOLS[i]) {
+			printf("invalid input\n");
+			return false;
+		}
+	}
+	
 	/* iterate through input, see if any chars are invalid */
 	for (i=0; i<length; i++) {
 		valid = false;
@@ -100,6 +106,13 @@ bool checkPipes(char *parsed[], int commandnum) {
 
 	for (i=0; i<commandnum; i++) {
 		currstring = parsed[i];
+		
+		// check if the command is not just whitespace
+		if (strcmp(currstring, " ") == 0) {
+			return false;
+		}
+
+		// check spacing of first command
 		if (i == 0) {	
 			length = strlen(currstring);
 			lastchar = currstring[length-1];
@@ -107,6 +120,8 @@ bool checkPipes(char *parsed[], int commandnum) {
 				return false;
 			}
 		} 
+		
+		// check spacing of next command
 		else {
 			firstchar = currstring[0];
 			if (firstchar != ' ') {
@@ -117,13 +132,7 @@ bool checkPipes(char *parsed[], int commandnum) {
 	return true;
 } 
 
-/* check errors in the command (after the input is validated and parsed) 
-* things to check for:
-* 	- redirection tokens used in wrong place
-* 	- only one of each redirect token per command
-* 	- (add more)
-*/
-/* TODO */
+/* check errors in the command (after the input is validated and parsed) */
 bool checkCommandErrors(command *totalcommands[], int commandnum) {
 	int i;
 	int j;
@@ -255,13 +264,13 @@ int main() {
 	command *totalcommands[1024];
 	bool commanderrors;
 
-	// get command from user
+	/* get command from user */
 	fgets(input, 1024, stdin);
 	
-	// remove the trailing newline
+	/* remove the trailing newline */
 	input[strcspn(input, "\n")] = 0;
 	
-	// check the input for any errors
+	/* check the input for any errors */
 	errors = checkInputErrors(input);
 	if (!errors) {
 		exit(0);
@@ -274,22 +283,23 @@ int main() {
 	else {
 		pipe = false;
 	}
-	
-	
-	/* parse the piped portions of the string */
-	// TODO move this to parseLine function??
+		
+
 	commandnum = 0;
 	saveptr = input;
-	
+
+	/* parse the piped portions of the string */
 	while ( (iter = strtok_r(saveptr, PIPE, &saveptr)) ) {
 		parsed[commandnum] = iter;
 		commandnum++;
 	}
 	
-	/* check to see if pipe is spaced correctly */
 	if (pipe) {
+		/* check to see if pipe is spaced correctly */
 	 	errors = checkPipes(parsed, commandnum);
-	}	
+	}
+	
+	/* if piping errors are found */
 	if (!errors) {
 		printf("invalid input 2\n");
 		exit(0);
@@ -307,6 +317,7 @@ int main() {
 	}
 
 	/* interpret the commands from the user */
+	
 
 	return 0;
 }
