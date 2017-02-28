@@ -6,12 +6,11 @@
 #include <assert.h>
 
 /* array that includes all legal characters in the shell */
-char LEGAL_CHARS[74] = {
+char LEGAL_CHARS[70] = {
 	'A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P','Q','R','S','T','U','V','W','X','Y','Z',
 	'a','b','c','d','e','f','g','h','i','j','k','l','m','n','o','p','q','r','s','t','u','v','w','x','y','z',
-	'0','1','2','3','4','5','6','7','8','9','0',
-	'-','.','_', 
-	'|','<','>'
+	'0','1','2','3','4','5','6','7','8','9',
+	'-','.','_','/', '|','<','>', ' '
 };
 
 /* legal tokens for the shell */
@@ -55,10 +54,10 @@ command *newCommand(int size, int number) {
 }
 
 
-/* parses the given string by the spaces*/
+/* TODO parses the given string by the spaces*/
 void parseLine(char *buff, char **returnbuff) {}
 
-/* check command input for errors, or exit command */
+/* check command input for errors, returns false if invalid*/
 bool checkInputErrors(char *buff) {
 	int length = strlen(buff);
 	if (strcmp(buff, "exit") == 0) {	
@@ -67,22 +66,23 @@ bool checkInputErrors(char *buff) {
 	/* iterate through input, see if any chars are invalid */
 	int i;
 	int j;
-	bool valid = false;
+	bool valid;
 	for (i=0; i<length; i++) {
-		for (j=0; j < 71; j++) {
-			// validates on the first character
-			// might be problematic later in development, keep an eye on this?
+		valid = false;
+		for (j=0; j < 70; j++) {
 			if (buff[i] == LEGAL_CHARS[j]) {	
 				valid = true;
+				break;
 			}
 		}
-		if (!valid) {
+		if (valid == false) {
 			printf("invalid input 1\n");
-			return false;
+			break;
 		}
-	}	
-	return true;
+	}
+	return valid;
 }
+
 
 /* check if input has any incorrect pipe stuff */
 bool checkPipes(char *parsed[], int commandnum) {
@@ -113,7 +113,85 @@ bool checkPipes(char *parsed[], int commandnum) {
 * 	- (add more)
 */
 /* TODO */
-//bool checkCommandErrors(char *buff) {}
+bool checkCommandErrors(command *totalcommands[], int commandnum) {
+	int i;
+	command *current;
+	int length;
+	bool legal;
+
+	for (i=0; i<commandnum; i++) {			
+		current = totalcommands[i];
+		length = current->length;
+		
+		int j;
+		for (j=0; j<length; j++) {
+			char* commandtoken = current->command[j];
+			
+			/* counting the number of file redirects */
+			if (strstr(commandtoken, INPUT_REDIR) != NULL) {
+				current->inputs += 1;
+			}
+
+			if (strstr(commandtoken, OUTPUT_REDIR) != NULL) {
+				current->outputs += 1;
+			}
+			
+			/* checking for errors in the user input */
+			if (strstr(commandtoken, "<<") != NULL) {
+				//syntax error
+				printf("invalid input 3\n");
+				legal = false;
+			}
+
+			if (strstr(commandtoken, ">>") != NULL) {
+				printf("invalid input 3\n");	
+				legal = false;
+			}		
+		}
+
+		if (current->inputs > 1) {
+			printf("invalid input 3\n");
+			legal = false;
+		}
+		
+		else if (current->outputs > 1) {
+			printf("invalid input 3\n");
+			legal = false;
+		} else {
+			legal = true;
+		}
+	}
+	return legal;
+}
+
+/* takes in the parsed commands, separates them into structs */
+void getCommands(command *totalcommands[], char *parsed[], int commandnum) {
+	int i;
+	for (i=0; i<commandnum; i++) {
+		char *currstring;
+		char *iter1;
+		char *saveptr1;
+		char *commands[1024];
+		int commandindex = 0;
+		
+		currstring = parsed[i];
+		saveptr1 = currstring;
+		
+		while ( (iter1 = strtok_r(saveptr1, SPACE, &saveptr1)) ) {
+			commands[commandindex] = iter1;
+			commandindex++;	
+		}
+		
+		command *newcommand = newCommand(commandindex, i);
+	
+		int j;
+		for (j=0; j<commandindex; j++) {
+			newcommand->command[j] = strdup(commands[j]);
+		}	
+		totalcommands[i] = newcommand;
+	}
+
+}
 
 int main() {
 	char input[1024];
@@ -123,6 +201,8 @@ int main() {
 	char *saveptr;
 	char *iter;
 	bool pipe;
+	command *totalcommands[1024];
+
 		
 	// get command from user
 	fgets(input, 1024, stdin);
@@ -154,9 +234,6 @@ int main() {
 		parsed[commandnum] = iter;
 		commandnum++;
 	}
-	/* free the pointers used to parse the string */
-	//free(iter);
-	//free(saveptr);
 	
 	/* check to see if pipe is spaced correctly */
 	if (pipe) {
@@ -165,50 +242,17 @@ int main() {
 	if (!errors) {
 		printf("invalid input 2\n");
 		exit(0);
-	}	
-	
-	/* CURRENT COMMAND STRUCT:
-	* - int: length of command 
-		- get this when parsing the command
-	* - int: number of command (i.e. order it is executed in)
-		- get this from commandnum
-		- if the output redir is used before the last command, throw error
-	* - int: number of input redirections
-		- more than one input redir, throw error
-	* - int: number of output redirections
-		- more than one output redir, throw error
-	* - char **: command 
-		- space parsed
-	*/
-
-	command *totalcommands[1024];	
-	int i;
-	for (i=0; i<commandnum; i++) {
-		char *currstring;
-		char *iter1;
-		char *saveptr1;
-		char *commands[1024];
-		int commandindex = 0;
-		
-		currstring = parsed[i];
-		saveptr1 = currstring;
-		
-		while ( (iter1 = strtok_r(saveptr1, SPACE, &saveptr1)) ) {
-			commands[commandindex] = iter1;
-			commandindex++;	
-		}
-		
-		command *newcommand = newCommand(commandindex, i);
-	
-		int j;
-		for (j=0; j<commandindex; j++) {
-			newcommand->command[j] = strdup(commands[j]);
-		}	
-		totalcommands[i] = newcommand;
-
 	}
 	
-	return 0;
+	/* parse the given command, separate into separate structs */
+	getCommands(totalcommands, parsed, commandnum);
 
-	/* TODO check commands for legality */
+	/* check commands for legality */
+	bool commanderrors = checkCommandErrors(totalcommands, commandnum);
+	
+	if (!commanderrors) {
+		exit(0);	
+	}
+
+	return 0;
 }
