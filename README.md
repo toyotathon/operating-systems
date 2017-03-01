@@ -7,6 +7,6 @@
 
 ### Project 1
 - Creating a shell that interprets basic Linux commands
-- Current stage: parsing user input from stdin
+- Utilizes C system library, system call functions
 
 
