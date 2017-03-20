@@ -11,4 +11,9 @@
   - supports piping and file redirection
 - Utilizes C system library, system call functions
 
+### Project 2
+- Writing a program to determine the largest number for a sequence of integers
+  - using a divide-and-conquer algorithm
+- integers to be used are read in from file (as a command line parameter)
+
 
