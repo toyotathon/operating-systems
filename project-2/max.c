@@ -23,6 +23,7 @@ bool checkExistingFile(const char * filename) {
 /* check to see if the file is not empty, return true if not null */
 bool checkNullFile(FILE *f) {
 	long size;
+
 	if (NULL != f) {
 		fseek(f, 0, SEEK_END);
 		size = ftell(f);
@@ -39,7 +40,6 @@ bool checkInvalidCharacters(char* buff) {
 	int i;
 	int length;
 
-
 	length = strlen(buff);
 	for (i = 0; i<length; i+=1) {
 		char current = buff[i];
@@ -52,16 +52,17 @@ bool checkInvalidCharacters(char* buff) {
 }
 
 int main(int argc, char **argv) {
-	FILE *f;
-	char buff[BUFFSIZE];
-	int	numbers[BUFFSIZE];
-	bool checks;
-	int length;
-	int numthreads;
-	int rounds;
-	int i;
+	FILE *f;				// file pointer
+	char buff[BUFFSIZE];	// buffer that will hold string input
+	int	numbers[BUFFSIZE];	// int array that will hold converted strings
+	bool checks;			// boolean used to check the input given by user
+	int length;				// # of numbers in the file
+	int numthreads;			// # of threads to be created
+	int rounds;				// # of rounds needed 
 
-	char *saveptr;
+	/* variables used to iterate and parse through input */
+	int i;	
+	char *saveptr;		
 	char *iter;
 	char *parsed[BUFFSIZE];
 	
@@ -105,7 +106,8 @@ int main(int argc, char **argv) {
 	} else {
 		exit(0);
 	}
-	/* convert string to int -> using strtol*/
+
+	/* convert strings in array to int */
 	for (i=0; i<length; i+=1) { 
 		numbers[i] = strtol(parsed[i], &saveptr, 10);	
 	}
