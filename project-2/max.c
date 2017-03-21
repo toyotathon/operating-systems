@@ -59,6 +59,7 @@ int main(int argc, char **argv) {
 	int length;
 	int numthreads;
 	int rounds;
+	int i;
 
 	char *saveptr;
 	char *iter;
@@ -94,6 +95,7 @@ int main(int argc, char **argv) {
 	/* buffer checks */
 	checks = checkInvalidCharacters(buff);
 	if (checks) {
+		/* parse the buffer by spaces */
 		length = 0;	
 		saveptr = buff;
 		while ((iter = strtok_r(saveptr, " ", &saveptr))) {
@@ -104,21 +106,13 @@ int main(int argc, char **argv) {
 		exit(0);
 	}
 	/* convert string to int -> using strtol*/
-	int i;
 	for (i=0; i<length; i+=1) { 
 		numbers[i] = strtol(parsed[i], &saveptr, 10);	
 	}
 	
 	numthreads = length / 2;
 	rounds = log2(length);
-	
-	
-	for (i=0; i<length; i+=1) {
-		printf("numbers[%d] => %d\n", i, numbers[i]);
-	}
-	printf("Number of threads: %d\n", numthreads);
-	printf("Number of rounds: %d\n", rounds);
-	
+		
 	return 0;
 }
 
