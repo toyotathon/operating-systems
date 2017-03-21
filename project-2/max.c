@@ -54,6 +54,7 @@ bool checkInvalidCharacters(char* buff) {
 int main(int argc, char **argv) {
 	FILE *f;
 	char buff[BUFFSIZE];
+	int	numbers[BUFFSIZE];
 	bool checks;
 	int length;
 	int numthreads;
@@ -102,9 +103,21 @@ int main(int argc, char **argv) {
 	} else {
 		exit(0);
 	}
+	/* convert string to int -> using strtol*/
+	int i;
+	for (i=0; i<length; i+=1) { 
+		numbers[i] = strtol(parsed[i], &saveptr, 10);	
+	}
 	
 	numthreads = length / 2;
 	rounds = log2(length);
+	
+	
+	for (i=0; i<length; i+=1) {
+		printf("numbers[%d] => %d\n", i, numbers[i]);
+	}
+	printf("Number of threads: %d\n", numthreads);
+	printf("Number of rounds: %d\n", rounds);
 	
 	return 0;
 }
