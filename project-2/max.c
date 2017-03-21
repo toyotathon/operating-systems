@@ -1,11 +1,24 @@
+#include <ctype.h>
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <ctype.h>
 #include <string.h>
 #include <stdbool.h>
-#include <math.h> 
+#include <unistd.h> 
 
 #define BUFFSIZE 1024
+
+/* check if file actually exists, returns true if it does */
+bool checkExistingFile(const char * filename) { 
+	int exists;
+
+	exists = access(filename, F_OK); 
+	if (exists != 0) {
+		printf("ERROR: %s does not exist.\n", filename);
+		return false;
+	}
+	return true;
+}
 
 /* check to see if the file is not empty, return true if not null */
 bool checkNullFile(FILE *f) {
@@ -14,7 +27,7 @@ bool checkNullFile(FILE *f) {
 		fseek(f, 0, SEEK_END);
 		size = ftell(f);
 		if (0 == size) {
-			printf("ERROR: file is empty\n");
+			printf("ERROR: file is empty.\n");
 			return false;
 		}
 	}
@@ -31,7 +44,7 @@ bool checkInvalidCharacters(char* buff) {
 	for (i = 0; i<length; i+=1) {
 		char current = buff[i];
 		if (!isdigit(current) && !isspace(current)) {
-			printf("ERROR: contains invalid character\n");
+			printf("ERROR: contains invalid character.\n");
 			return false;
 		}
 	}
@@ -49,15 +62,29 @@ int main(int argc, char **argv) {
 	char *saveptr;
 	char *iter;
 	char *parsed[BUFFSIZE];
-
-	/* read from the file containing the integers */	
-	f = fopen(argv[1], "r");
+	
+	/* check for correct number of arguments */	
+	if (argc != 2) {
+		printf("ERROR: incorrect number of arguments given.\n");
+		exit(0);
+	}
+	
+	/* check if file exists */
+	checks = checkExistingFile(argv[1]);
+	if (checks) {
+		/* read from the file containing the integers */
+		f = fopen(argv[1], "r");
+	} else {
+		exit(0);
+	}	
 
 	/* file checks */
 	checks = checkNullFile(f);	
 	if (checks) {
+		/* go back to beginning of file, grab first line */
 		rewind(f);
 		fgets(buff, BUFFSIZE-1, f);
+		/* close file before return */
 		fclose(f);
 	} else {
 		exit(0);
@@ -79,7 +106,6 @@ int main(int argc, char **argv) {
 	numthreads = length / 2;
 	rounds = log2(length);
 	
-	/* close file before return */
 	return 0;
 }
 
