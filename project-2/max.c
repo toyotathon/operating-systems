@@ -9,85 +9,64 @@
 #include <semaphore.h>
 
 /* TODO create header files for thread and parsing stuff*/
-
+#include "parsing.h"
 
 #define BUFFSIZE 4096
-
-/* Global Variables */
-sem_t mutex;
-sem_t b1;
-sem_t b2;
 
 /* Thread Struct */
 typedef struct {
 	pthread_t id;
 	int arrayIndex;
 	int finalIndex;
-	int returnval;
+	int returnVal;
 } threadStruct;
 
 /* Argument Struct */
+typedef struct {
+	sem_t mutex;
+	sem_t b1;
+	sem_t b2;
+	int rounds;
+	int finalVal; 
+	int *number;
+	int *final; 
+	threadStruct *thread;
+} argStruct;
 
-/* check if file actually exists, returns true if it does */
-bool checkExistingFile(const char * filename) { 
-	int exists;
+/* function that will create a new argStruct and initialize all initial values */
+argStruct *newArgStruct(sem_t m, sem_t b1, sem_t b2, int r, int n[], int f[], threadStruct *t) {
+	argStruct *newargs = calloc(1, sizeof(argStruct));
 
-	exists = access(filename, F_OK); 
-	if (exists != 0) {
-		printf("ERROR: %s does not exist.\n", filename);
-		return false;
-	}
-	return true;
-}
-
-/* check to see if the file is not empty, return true if not null */
-bool checkNullFile(FILE *f) {
-	long size;
-
-	if (NULL != f) {
-		fseek(f, 0, SEEK_END);
-		size = ftell(f);
-		if (0 == size) {
-			printf("ERROR: file is empty.\n");
-			return false;
-		}
-	}
-	return true;
-}
-
-/* check for alphabetic characters, return true if none found */
-bool checkInvalidCharacters(char* buff) {
-	int i;
-	int length;
-
-	length = strlen(buff);
-	for (i = 0; i<length; i+=1) {
-		char current = buff[i];
-		if (!isdigit(current) && !isspace(current)) {
-			printf("ERROR: contains invalid character.\n");
-			return false;
-		}
-	}
-	return true;
-}
-
-void *threadMax(void *thread, int numbers[]) {
-	int max;
-	int mcount = 0;
-
-	threadStruct *curr = (threadStruct *) thread;
-	max = numbers[curr->arrayIndex];
+	newargs->mutex = m;
+	newargs->b1 = b1;
+	newargs->b2 = b2;
+	newargs->rounds = r;
+	newargs->finalVal = 0;
+	newargs->number = n;
+	newargs->final= f;
+	newargs->thread = t;
 	
+	return newargs;	
+}
+
+
+void *threadMax(void *args) {	
+	return 0;	
 }
 
 int main(int argc, char **argv) {
 	FILE *f;				// file pointer
 	char buff[BUFFSIZE];	// buffer that will hold string input
 	int	numbers[BUFFSIZE];	// int array that will hold converted strings
+	int final[BUFFSIZE];	// int array that will contain the return value	
 	bool checks;			// boolean used to check the input given by user
 	int length;				// # of numbers in the file
 	int numthreads;			// # of threads to be created
-	int rounds;				// # of rounds needed 
+	int rounds;				// # of rounds needed
+	sem_t mutex;
+	sem_t b1;
+	sem_t b2;
+
 
 	/* variables used to iterate and parse through input */
 	int i;	
@@ -149,14 +128,32 @@ int main(int argc, char **argv) {
 	sem_init(&mutex, 0, 1);
 	sem_init(&b1, 0, 0);
 	sem_init(&b2, 0, 1);
-
-	/* getting values from threads, move to separate function */
 	
-	
-
-	
-	
+	// initial values 
+	int assigned = 0;
+	int finarray = 0;
+	int threadcond = -1;
+	for (i=0; i<numthreads; i+=1) {
+		threads[i].arrayIndex = assigned;
+		threads[i].finalIndex = finarray;
 		
+		finarray += 1;
+		assigned += 2;
+
+		argStruct *args = newArgStruct(mutex, b1, b2, rounds, numbers, final, &threads[i]);
+		
+		threadcond = pthread_create(&(threads[i].id), NULL, &threadMax, args);
+
+		if (threadcond != 0) {
+			printf("ERROR: unsuccessfully created thread.");
+			exit(0);
+		}
+	}
+
+	for (i=0; i<numthreads; i+=1) {
+		pthread_join(threads[i].id, NULL);
+	}
+	
 	return 0;
 }
 
