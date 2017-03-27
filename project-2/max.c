@@ -4,9 +4,29 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdbool.h>
-#include <unistd.h> 
+#include <unistd.h>
+#include <pthread.h>
+#include <semaphore.h>
 
-#define BUFFSIZE 1024
+/* TODO create header files for thread and parsing stuff*/
+
+
+#define BUFFSIZE 4096
+
+/* Global Variables */
+sem_t mutex;
+sem_t b1;
+sem_t b2;
+
+/* Thread Struct */
+typedef struct {
+	pthread_t id;
+	int arrayIndex;
+	int finalIndex;
+	int returnval;
+} threadStruct;
+
+/* Argument Struct */
 
 /* check if file actually exists, returns true if it does */
 bool checkExistingFile(const char * filename) { 
@@ -49,6 +69,15 @@ bool checkInvalidCharacters(char* buff) {
 		}
 	}
 	return true;
+}
+
+void *threadMax(void *thread, int numbers[]) {
+	int max;
+	int mcount = 0;
+
+	threadStruct *curr = (threadStruct *) thread;
+	max = numbers[curr->arrayIndex];
+	
 }
 
 int main(int argc, char **argv) {
@@ -114,6 +143,19 @@ int main(int argc, char **argv) {
 	
 	numthreads = length / 2;
 	rounds = log2(length);
+
+	/* initialize structs and data needed to create threads */
+	threadStruct threads[numthreads];
+	sem_init(&mutex, 0, 1);
+	sem_init(&b1, 0, 0);
+	sem_init(&b2, 0, 1);
+
+	/* getting values from threads, move to separate function */
+	
+	
+
+	
+	
 		
 	return 0;
 }
