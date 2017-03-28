@@ -116,7 +116,7 @@ int main(int argc, char **argv) {
 			max = args->final[i];
 		}	
 	}
-	printf("max int: %d\n", max);
+	printf("%d\n", max);
 	
 	return 0;
 }
