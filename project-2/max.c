@@ -8,7 +8,7 @@
 #include <pthread.h>
 #include <semaphore.h>
 
-/* TODO create header files for thread and parsing stuff*/
+/* header files for thread and parsing functions */
 #include "parsing.h"
 #include "threading.h"
 
@@ -20,7 +20,13 @@ int main(int argc, char **argv) {
 	int	numbers[BUFFSIZE];	// int array that will hold converted strings
 	bool checks;			// boolean used to check the input given by user
 	int length;				// # of numbers in the file
+	int max;
 
+	/* initial values for thread creation */
+	int assigned = 0;
+	int finarray = 0;
+	argStruct *args;
+	int threadcond = -1;
 
 	/* variables used to iterate and parse through input */
 	int i;	
@@ -82,12 +88,7 @@ int main(int argc, char **argv) {
 	sem_init(&mutex, 0, 1);
 	sem_init(&b1, 0, 0);
 	sem_init(&b2, 0, 1);
-	
-	// initial values 
-	int assigned = 0;
-	int finarray = 0;
-	argStruct *args;
-	int threadcond = -1;
+		
 	for (i=0; i<numthreads; i+=1) {
 		threads[i].arrayIndex = assigned;
 		threads[i].finalIndex = finarray;
@@ -105,17 +106,8 @@ int main(int argc, char **argv) {
 		}	
 	}
 
-	for (i=0; i<numthreads; i+=1) {
-		pthread_join(threads[i].id, NULL);
-	}
-	
-	int max;
-	max = args->final[0];
-	for (i=1; i<numthreads; i+=1) {
-		if (args->final[i] > max) {
-			max = args->final[i];
-		}	
-	}
+	max = finalMax(numthreads, threads, args);
+
 	printf("%d\n", max);
 	
 	return 0;

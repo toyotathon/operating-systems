@@ -146,3 +146,22 @@ void *threadMax(void *a) {
 	}	
 	return 0;	
 }
+
+int finalMax(int numthreads, threadStruct threads[], argStruct *args) {
+	int i;
+	int max;
+	
+	for (i=0; i<numthreads; i+=1) {
+		pthread_join(threads[i].id, NULL);
+	}
+	
+	max = args->final[0];
+	for (i=1; i<numthreads; i+=1) {
+		if (args->final[i] > max) {
+			max = args->final[i];
+		}	
+	}
+	
+	return max;
+
+}
