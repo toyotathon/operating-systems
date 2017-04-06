@@ -47,7 +47,6 @@ argStruct *newArgStruct(sem_t m, sem_t b1, sem_t b2, int nt, int r, int n[], int
 
 
 void *threadMax(void *a) {
-	/* getting and setting arguments for routine */
 	static argStruct *args;
 	sem_t mutex;
 	sem_t b1;
