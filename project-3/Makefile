@@ -1,2 +1,2 @@
-all: vm.c
-	gcc vm.c -Wall -g -o  vm
+all: vmm.c
+	gcc vmm.c -Wall -g -o  vmm

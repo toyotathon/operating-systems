@@ -61,7 +61,7 @@ int main(int argc, char *argv[]) {
 	/* initialize tables, etc */
 	int i;
 	for (i=0; i<PM_SIZE; i++) {
-		physical_memory[i] = i;
+		physical_memory[i] = -1;
 	}
 	
 	for (i=0; i<VM_SIZE; i++) {
@@ -74,6 +74,12 @@ int main(int argc, char *argv[]) {
 		address = strtol(value, &saveptr, 10);
 		lower = address & LOW_16_BITS;
 		pagenum =  lower >> 8;
+		
+		//TODO page hit implement
+		
+		//TODO page fault implement
+
+		//TODO tlb implement
 				
 	}	
 	
