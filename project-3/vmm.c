@@ -7,40 +7,48 @@
 /* header files for parsing, other things coming */
 #include "parsing.h"
 
-const int PAGE_SIZE = 256;
-const int VM_SIZE = 256;
-const int PM_SIZE = 128;
+#define PAGE_TABLE 8
+#define PAGE_SIZE 16
 
 /* masks to get lower 16 bits, page number, and offset */
 const uint16_t LOW_16_BITS = 0xFFFF;
 const uint16_t LOW_8_BITS = 0xFF;
-//const uint16_t HIGH_8_BITS = 0xFF00;
+
+typedef struct {
+	int page;
+	int frame;
+} block;
+
+block blockInit() {
+	block newBlock = {0,0};
+	return newBlock;
+}
 
 int main(int argc, char *argv[]) {
 	bool checks;
 	FILE *addresses;
 	FILE *bs;
-	int framenum;
+	
+	/* data structures for vmm */
+	int physicalMemory[PAGE_TABLE][256];
+	block pageTable[PAGE_TABLE] = {blockInit()};
 
-	int physical_memory[PM_SIZE];
-	/*
-	virtual_memory initialization
-	[0] -> physical address
-	[1] -> age 
-	*/
-	int virtual_memory[VM_SIZE];
-	/* TODO implement TLB */
+	/* variables for data display */
+	int total = 0;
+	int fault = 0;
+	int hits = 0;
 
+	/* variables for parsing the address */
 	uint32_t address;
 	uint16_t lower;
 	uint8_t pagenum;
 	uint8_t offset;
 
 	/* variables for iterating through txt file */
-	ssize_t read;
+	char *value = NULL;
 	char *saveptr;
 	size_t len = 0;
-	char *value = NULL;
+	ssize_t read;
 
 	/* ***check arguments, make sure they have been entered properly*** */	
 	/* check for correct number of arguments */
@@ -58,28 +66,12 @@ int main(int argc, char *argv[]) {
 		exit(0);
 	}
 
-	/* initialize tables, etc */
-	int i;
-	for (i=0; i<PM_SIZE; i++) {
-		physical_memory[i] = -1;
-	}
-	
-	for (i=0; i<VM_SIZE; i++) {
-		framenum = i*PAGE_SIZE;
-		virtual_memory[i] = framenum;
-	}
-
 	/* read in addresses, apply mask */
 	while ((read = getline(&value, &len, addresses)) != -1) {
 		address = strtol(value, &saveptr, 10);
 		lower = address & LOW_16_BITS;
 		pagenum =  lower >> 8;
-		
-		//TODO page hit implement
-		
-		//TODO page fault implement
-
-		//TODO tlb implement
+		offset = lower & LOW_8_BITS;
 				
 	}	
 	
