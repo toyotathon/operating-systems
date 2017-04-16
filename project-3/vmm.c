@@ -32,6 +32,13 @@ typedef struct {
 	int frame;
 } tlbBlock;
 
+tlbBlock tlbBlockInit() {
+	tlbBlock tlb;
+	tlb.page = -1;
+	tlb.frame = -1;
+	return tlb;
+}
+
 tlbBlock newTLBBlock(int page, int frame) {
 	tlbBlock tlb;
 	tlb.page = page;
@@ -66,12 +73,24 @@ int physicalMemory[FRAMES][256];
 bool freeFrames[FRAMES]; 
 pageBlock pageTable[PAGE_TABLE];
 tlbBlock tlb[TLB_ENTRIES]; // TODO implement TLB
+bool freeTLB[TLB_ENTRIES];
 
 int currentFreeFrame() {
 	int i;
 	for (i=0; i<FRAMES; i+=1) {
-		if (freeFrames[i] == true) {
+		if (freeFrames[i]) {
 			freeFrames[i] = false;
+			return i;
+		}
+	}
+	return -1;
+}
+
+int currentFreeTLB() {
+	int i; 
+	for (i=0; i<TLB_ENTRIES; i+=1) {
+		if (freeTLB[i])	{
+			freeTLB[i] = false;
 			return i;
 		}
 	}
@@ -119,8 +138,18 @@ int main(int argc, char *argv[]) {
 	
 	int i;
 	/* initializing page table contents */
-	for (i=0; i<PAGE_TABLE ;i+=1) {
+	for (i=0; i<PAGE_TABLE; i+=1) {
 		pageTable[i] = pageBlockInit();
+	}
+	
+	/* initializing TLB contents */	
+	for (i=0; i<TLB_ENTRIES; i+=1) {
+		tlb[i] = tlbBlockInit();
+	}
+
+	/* initalizing free TLB entries list */
+	for (i=0; i<TLB_ENTRIES; i+=1) {
+		freeTLB[i] = true;
 	}
 
 	/* initializing free frame list */
@@ -133,76 +162,107 @@ int main(int argc, char *argv[]) {
 		total += 1;
 		address = strtol(value, &saveptr, 10);
 		pagenum = (address & PAGE_NUMBER_BITS) >> 8;
-		
-		printf("Address: %d\n", address);
+
 		printf("Page number: %d\n", pagenum);
 		
-		// page is NOT in memory
-		if (!pageTable[pagenum].inmem) {
-			fault += 1;
-			// TODO error message here
-			printf("Virtual address %d contained in page %d causes a page fault.\n",address,pagenum);
-			// check free frame list
-			int free = currentFreeFrame();
-			if (free == -1) { 
-				// do something to free up physical mem
-				int framereplace;
-				unsigned min;
-				min = pageTable[0].counter;
-				int replace = 0;
-				for (i=1; i<PAGE_TABLE; i+=1) {
-					if (pageTable[i].counter < min){
-						min = pageTable[i].counter;
-						replace = i;
-						printf("getting reached");
-					} 
-				}
-				printf("Page %d is being replaced.\n", replace);
-				pageTable[replace].inmem = false;
-				framereplace = pageTable[replace].page;
-				
-				pageTable[pagenum].page = framereplace;
-				pageTable[pagenum].inmem = true;
-				pageTable[pagenum].counter |= COUNTER;	
 
-				int j;
-				int data;
-				for (j=0; j< 265; j+=1) {
-					fseek(bs, pagenum*256+j*4, SEEK_SET);
-					fread(&data, sizeof(data), 1, bs);
-					physicalMemory[framereplace][j] = data;
-				}
-			} 
-			else {
-				// set the page value in page table
-				pageTable[pagenum].page = free;
-				pageTable[pagenum].inmem = true;
-				pageTable[pagenum].counter |= COUNTER;
-
-				// set physical memory
-				int j;
-				int data;
-				for (j=0; j< 265; j+=1) {
-					fseek(bs, pagenum*256+j*4, SEEK_SET);
-					fread(&data, sizeof(data), 1, bs);
-					physicalMemory[free][j] = data;
-				}
-			}	
-		} 
-	
-		// page is in memory
-		else {
-			hits += 1;
-			pageTable[pagenum].counter |= COUNTER;
-			// TODO message here 	
+		/* TLB Stage */
+		int t = 0;
+		while (tlb[t].page != pagenum && t < TLB_ENTRIES) {
+			t += 1;
 		}
-		// shift bits to move clock
+
+		if (t == TLB_ENTRIES) {
+			printf("Frame number for page %d is missing in the TLB.\n", pagenum);
+
+			int freeTLB = currentFreeTLB();
+			if (freeTLB == -1) {
+				// TODO implement FIFO replacement
+				printf("yikes, no room in TLB\n");
+			} 
+			
+			/* Page Table Stage */
+			/* If page is not in memory: */
+			if (!pageTable[pagenum].inmem) {
+				fault += 1;
+
+				printf("Virtual address %d contained in page %d causes a page fault.\n",address,pagenum);
+				/* check free frame list */
+				int free = currentFreeFrame();
+				if (free == -1) { 
+					/* use LRU algorithm to find a page to replace */
+					int framereplace;
+					unsigned min;
+					min = pageTable[0].counter;
+					int replace = 0;
+					for (i=1; i<PAGE_TABLE; i+=1) {
+						if (pageTable[i].counter < min){
+							// TODO ensure that this code is getting reached?
+							min = pageTable[i].counter;
+							replace = i;
+							printf("getting reached");
+						} 
+					}
+					/* clear values from page being replaced, get new frame */
+					printf("Page %d is being replaced.\n", replace);
+					framereplace = pageTable[replace].page;
+					pageTable[replace] = pageBlockInit();
+	
+					pageTable[pagenum] = newPageBlock(framereplace);			
+					pageTable[pagenum].counter |= COUNTER;
+		
+					tlb[freeTLB].page = pagenum;
+					tlb[freeTLB].frame = framereplace;
+
+					int j;
+					int data;
+					for (j=0; j< 265; j+=1) {
+						fseek(bs, pagenum*256+j*4, SEEK_SET);
+						fread(&data, sizeof(data), 1, bs);
+						physicalMemory[framereplace][j] = data;
+					}
+				} 
+				else {
+					// set the page value in page table
+					pageTable[pagenum].page = free;
+					pageTable[pagenum].inmem = true;
+					pageTable[pagenum].counter |= COUNTER;
+	
+					tlb[freeTLB].page = pagenum;
+					tlb[freeTLB].frame = free;
+
+					// set physical memory
+					int j;
+					int data;
+					for (j=0; j< 265; j+=1) {
+						fseek(bs, pagenum*256+j*4, SEEK_SET);
+						fread(&data, sizeof(data), 1, bs);
+						physicalMemory[free][j] = data;
+					}
+				}	
+			} 
+		
+			/* When page is in memory: */
+			else {
+				hits += 1;
+				pageTable[pagenum].counter |= COUNTER;
+				
+				tlb[freeTLB].page = pagenum;
+				tlb[freeTLB].frame = pageTable[pagenum].page;
+
+				printf("Page %d is contained in frame %d.\n", pagenum, pageTable[pagenum].page);
+			}
+		} 
+		/* TLB Hit */
+		else {	
+			printf("Page %d is stored in frame %d in entry %d of TLB.\n", 
+					tlb[t].page, tlb[t].frame, t);	
+		}
+	
+		/* Shift counter bits to move clock */
 		for (i=0; i<PAGE_TABLE; i+=1) {
 			pageTable[i].counter >>= 1;	
 		}
-		//for (i=0; i<PAGE_TABLE; i+=1) {
-		//	printf("Page %d count: %d\n", i, pageTable[i].counter);
-		//}
 	}	
 	fclose(addresses);
 }
