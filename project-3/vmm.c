@@ -74,7 +74,6 @@ bool freeFrames[FRAMES];
 pageBlock pageTable[PAGE_TABLE];
 tlbBlock tlb[TLB_ENTRIES]; 
 bool freeTLB[TLB_ENTRIES];
-// first attempt at implementing FIFO
 int tlbEvictIndex = 0;
 
 
