@@ -5,7 +5,7 @@
 #include <string.h>
 
 /* header files for parsing, other things coming */
-#include "parsing.h"
+//#include "parsing.h"
 
 #define PAGE_TABLE 16
 #define FRAMES 8
@@ -113,8 +113,15 @@ int evictTLB() {
 	return index;
 }
 
+/* Shift counter bits to move clock */
+void shiftClock() {
+	int i;
+	for (i=0; i<PAGE_TABLE; i+=1) {
+		pageTable[i].counter >>= 1;	
+	}
+}
+
 int main(int argc, char *argv[]) {
-	bool checks;
 	FILE *addresses;
 	FILE *bs;
 
@@ -134,21 +141,8 @@ int main(int argc, char *argv[]) {
 	size_t len = 0;
 	ssize_t read;
 
-	/* ***check arguments, make sure they have been entered properly*** */	
-	/* check for correct number of arguments */
-	if (argc != 2) {
-		printf("ERROR: incorrect number of arguments given.\n");
-		exit(0);
-	}
-
-	/* check if file exists */	
-	checks = checkExistingFile(argv[1]);
-	if (checks) {
-		addresses = fopen(argv[1], "r");
-		bs = fopen("BACKING_STORE.bin", "rb");
-	} else {
-		exit(0);
-	}
+	addresses = fopen("addresses.txt", "r");
+	bs = fopen("BACKING_STORE.bin", "rb");
 	
 	int i;
 	/* initializing page table contents */
@@ -176,9 +170,6 @@ int main(int argc, char *argv[]) {
 		total += 1;
 		address = strtol(value, &saveptr, 10);
 		pagenum = (address & PAGE_NUMBER_BITS) >> 8;
-
-		printf("Page number: %d\n", pagenum);
-		
 
 		/* TLB Stage */
 		int t = 0;
@@ -214,17 +205,21 @@ int main(int argc, char *argv[]) {
 							replace = i;
 						} 
 					}
-
 					/* clear values from page being replaced, get new frame */
-					printf("Page %d is being replaced.\n", replace);
 					framereplace = pageTable[replace].page;
 					pageTable[replace] = pageBlockInit();
 	
 					pageTable[pagenum] = newPageBlock(framereplace);			
 					pageTable[pagenum].counter |= COUNTER;
+	
+					printf("Page %d is loaded into frame %d.\n", pagenum, framereplace);
 		
 					tlb[freeTLB].page = pagenum;
 					tlb[freeTLB].frame = framereplace;
+				
+					printf("Frame %d containing page %d is stored in entry %d of the TLB\n",
+							tlb[freeTLB].frame, tlb[freeTLB].page, freeTLB);
+
 
 					int j;
 					int data;
@@ -239,9 +234,14 @@ int main(int argc, char *argv[]) {
 					pageTable[pagenum].page = free;
 					pageTable[pagenum].inmem = true;
 					pageTable[pagenum].counter |= COUNTER;
+
+					printf("Page %d is loaded into frame %d.\n", pagenum, free);
 	
 					tlb[freeTLB].page = pagenum;
 					tlb[freeTLB].frame = free;
+
+					printf("Frame %d containing page %d is stored in entry %d of the TLB\n",
+							tlb[freeTLB].frame, tlb[freeTLB].page, freeTLB);
 
 					/* set physical memory */
 					int j;
@@ -259,22 +259,22 @@ int main(int argc, char *argv[]) {
 				hits += 1;
 				pageTable[pagenum].counter |= COUNTER;
 				
+				printf("Page %d is contained in frame %d.\n", pagenum, pageTable[pagenum].page);
+			
 				tlb[freeTLB].page = pagenum;
 				tlb[freeTLB].frame = pageTable[pagenum].page;
-
-				printf("Page %d is contained in frame %d.\n", pagenum, pageTable[pagenum].page);
+				
+				printf("Frame %d containing page %d is stored in entry %d of the TLB\n",
+						tlb[freeTLB].frame, tlb[freeTLB].page, freeTLB);
 			}
 		} 
+		
 		/* TLB Hit */
 		else {	
 			printf("Page %d is stored in frame %d in entry %d of TLB.\n", 
 					tlb[t].page, tlb[t].frame, t);	
 		}
-	
-		/* Shift counter bits to move clock */
-		for (i=0; i<PAGE_TABLE; i+=1) {
-			pageTable[i].counter >>= 1;	
-		}
+		shiftClock();	
 	}	
 	fclose(addresses);
 }
