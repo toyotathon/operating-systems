@@ -47,21 +47,24 @@ tlbBlock newTLBBlock(int page, int frame) {
 }
 
 typedef struct {
+	int index;
 	int page;
 	bool inmem;
 	unsigned counter;	
 } pageBlock;
 
-pageBlock pageBlockInit() {
+pageBlock pageBlockInit(int index) {
 	pageBlock p;
+	p.index = index;
 	p.page = 0;
 	p.inmem = false;
 	p.counter = 0;
 	return p;
 }
 
-pageBlock newPageBlock(int page) {
+pageBlock newPageBlock(int page, int index) {
 	pageBlock p;
+	p.index = index;
 	p.page = page;
 	p.inmem = true;
 	p.counter = 0;
@@ -101,6 +104,21 @@ int currentFreeTLB() {
 	return -1;
 }
 
+int evictPageTable() {
+	int i;
+	unsigned min;
+	int replace;
+
+	min = pageTable[0].counter;
+	for (i=1; i<(PAGE_TABLE-1); i+=1) {
+		if ((pageTable[i].counter < min) && pageTable[i].inmem){
+			min = pageTable[i].counter;
+			replace = i;
+		} 
+	}
+	return replace;
+}
+
 int evictTLB() {
 	int index; 
 	
@@ -126,9 +144,10 @@ int main(int argc, char *argv[]) {
 	FILE *bs;
 
 	/* variables for data display */
-	int total = 0;
-	int fault = 0;
-	int hits = 0;
+	double total = 0;
+	double fault = 0;
+	double hits = 0;
+	double tlbHits = 0;
 
 	/* variables for parsing the address */
 	int address;	
@@ -147,7 +166,7 @@ int main(int argc, char *argv[]) {
 	int i;
 	/* initializing page table contents */
 	for (i=0; i<PAGE_TABLE; i+=1) {
-		pageTable[i] = pageBlockInit();
+		pageTable[i] = pageBlockInit(i);
 	}
 	
 	/* initializing TLB contents */	
@@ -197,27 +216,37 @@ int main(int argc, char *argv[]) {
 					/* use LRU algorithm to find a page to replace */
 					int framereplace;
 					unsigned min;
-					min = pageTable[0].counter;
-					int replace = 0;
-					for (i=1; i<(PAGE_TABLE-1); i+=1) {
-						if ((pageTable[i].counter < min) && pageTable[i].inmem){
-							min = pageTable[i].counter;
-							replace = i;
-						} 
+					int replace;
+					//min = pageTable[15].counter;
+					for (i=0; i<PAGE_TABLE; i+=1) {
+						if (pageTable[i].inmem) {
+							min = pageTable[i].counter;	
+							break;
+						}	
+					}
+					printf("BREAK: min is %d\n", min);
+					for (i=0; i<PAGE_TABLE; i+=1) {
+						if (pageTable[i].inmem) {
+							if (pageTable[i].counter < min){
+								min = pageTable[i].counter;
+								printf("new min: %d\n", min);	
+								replace = i;
+							} 
+						}
 					}
 					/* clear values from page being replaced, get new frame */
 					framereplace = pageTable[replace].page;
-					pageTable[replace] = pageBlockInit();
+					pageTable[replace] = pageBlockInit(replace);
+					pageTable[replace].inmem = false; 
 	
-					pageTable[pagenum] = newPageBlock(framereplace);			
-					pageTable[pagenum].counter |= COUNTER;
+					pageTable[pagenum] = newPageBlock(framereplace, pagenum);
 	
 					printf("Page %d is loaded into frame %d.\n", pagenum, framereplace);
 		
 					tlb[freeTLB].page = pagenum;
 					tlb[freeTLB].frame = framereplace;
 				
-					printf("Frame %d containing page %d is stored in entry %d of the TLB\n",
+					printf("Frame %d containing page %d is stored in entry %d of the TLB.\n",
 							tlb[freeTLB].frame, tlb[freeTLB].page, freeTLB);
 
 
@@ -240,7 +269,7 @@ int main(int argc, char *argv[]) {
 					tlb[freeTLB].page = pagenum;
 					tlb[freeTLB].frame = free;
 
-					printf("Frame %d containing page %d is stored in entry %d of the TLB\n",
+					printf("Frame %d containing page %d is stored in entry %d of the TLB.\n",
 							tlb[freeTLB].frame, tlb[freeTLB].page, freeTLB);
 
 					/* set physical memory */
@@ -264,17 +293,46 @@ int main(int argc, char *argv[]) {
 				tlb[freeTLB].page = pagenum;
 				tlb[freeTLB].frame = pageTable[pagenum].page;
 				
-				printf("Frame %d containing page %d is stored in entry %d of the TLB\n",
+				printf("Frame %d containing page %d is stored in entry %d of the TLB.\n",
 						tlb[freeTLB].frame, tlb[freeTLB].page, freeTLB);
 			}
 		} 
 		
 		/* TLB Hit */
-		else {	
+		else {
+			tlbHits += 1;	
 			printf("Page %d is stored in frame %d in entry %d of TLB.\n", 
 					tlb[t].page, tlb[t].frame, t);	
 		}
-		shiftClock();	
-	}	
+		shiftClock();
+		printf("\n");
+	}
+	printf("\n");
+
+	/* Statistic stage */	
+	int k;
+	printf("Contents of page table: \n");
+	for (k=0; k<PAGE_TABLE; k+=1) {
+		if ((pageTable[k].page == 0) && !pageTable[k].inmem) {	
+			printf("Page %d => empty\n", k);
+		} 
+		else {
+			printf("Page %d => %d\n", k, pageTable[k].page);
+		} 
+	}
+	printf("\n");
+
+	//printf("Contents of page frames: \n");
+	//for (k=0; k<FRAMES; k+=1) {
+	//	printf("Frame %d => page %d\n", pageTable[k].page, pageTable[k].index);
+	//}
+	//printf("\n");
+
+	double pageTableFaultRate = fault/total;
+	double tlbHitRate = tlbHits/total;	
+	printf("Page fault rate: %f hits/reference\n", pageTableFaultRate);
+	printf("TLB hit rate: %f hits/reference\n", tlbHitRate);
+
 	fclose(addresses);
+	fclose(bs);
 }
