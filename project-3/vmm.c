@@ -72,9 +72,13 @@ pageBlock newPageBlock(int page) {
 int physicalMemory[FRAMES][256];
 bool freeFrames[FRAMES]; 
 pageBlock pageTable[PAGE_TABLE];
-tlbBlock tlb[TLB_ENTRIES]; // TODO implement TLB
+tlbBlock tlb[TLB_ENTRIES]; 
 bool freeTLB[TLB_ENTRIES];
+// first attempt at implementing FIFO
+int tlbEvictIndex = 0;
 
+
+/* searches free frame list for an open index, returns -1 if there is not a free frame */
 int currentFreeFrame() {
 	int i;
 	for (i=0; i<FRAMES; i+=1) {
@@ -86,6 +90,7 @@ int currentFreeFrame() {
 	return -1;
 }
 
+/* searches free TLB entry list for an open index, returns -1 if there is not a free frame*/
 int currentFreeTLB() {
 	int i; 
 	for (i=0; i<TLB_ENTRIES; i+=1) {
@@ -97,12 +102,22 @@ int currentFreeTLB() {
 	return -1;
 }
 
+int evictTLB() {
+	int index; 
+	
+	index = tlbEvictIndex;
+	if (index == TLB_ENTRIES) {
+		tlbEvictIndex = 0;
+		index = 0;
+	}
+	tlbEvictIndex += 1;
+	return index;
+}
+
 int main(int argc, char *argv[]) {
 	bool checks;
 	FILE *addresses;
 	FILE *bs;
-	
-	/* variables for pointing, iterating through data structure */
 
 	/* variables for data display */
 	int total = 0;
@@ -177,8 +192,7 @@ int main(int argc, char *argv[]) {
 
 			int freeTLB = currentFreeTLB();
 			if (freeTLB == -1) {
-				// TODO implement FIFO replacement
-				printf("yikes, no room in TLB\n");
+				freeTLB = evictTLB();
 			} 
 			
 			/* Page Table Stage */
@@ -195,14 +209,13 @@ int main(int argc, char *argv[]) {
 					unsigned min;
 					min = pageTable[0].counter;
 					int replace = 0;
-					for (i=1; i<PAGE_TABLE; i+=1) {
-						if (pageTable[i].counter < min){
-							// TODO ensure that this code is getting reached?
+					for (i=1; i<(PAGE_TABLE-1); i+=1) {
+						if ((pageTable[i].counter < min) && pageTable[i].inmem){
 							min = pageTable[i].counter;
 							replace = i;
-							printf("getting reached");
 						} 
 					}
+
 					/* clear values from page being replaced, get new frame */
 					printf("Page %d is being replaced.\n", replace);
 					framereplace = pageTable[replace].page;
@@ -223,7 +236,7 @@ int main(int argc, char *argv[]) {
 					}
 				} 
 				else {
-					// set the page value in page table
+					/* set the page value in page table */
 					pageTable[pagenum].page = free;
 					pageTable[pagenum].inmem = true;
 					pageTable[pagenum].counter |= COUNTER;
@@ -231,7 +244,7 @@ int main(int argc, char *argv[]) {
 					tlb[freeTLB].page = pagenum;
 					tlb[freeTLB].frame = free;
 
-					// set physical memory
+					/* set physical memory */
 					int j;
 					int data;
 					for (j=0; j< 265; j+=1) {
