@@ -314,7 +314,7 @@ int main(int argc, char *argv[]) {
 	printf("Contents of page table: \n");
 	for (k=0; k<PAGE_TABLE; k+=1) {
 		if ((pageTable[k].page == 0) && !pageTable[k].inmem) {	
-			printf("Page %d => empty\n", k);
+			printf("Page %d => not in memory\n", k);
 		} 
 		else {
 			printf("Page %d => %d\n", k, pageTable[k].page);
@@ -322,12 +322,23 @@ int main(int argc, char *argv[]) {
 	}
 	printf("\n");
 
-	//printf("Contents of page frames: \n");
-	//for (k=0; k<FRAMES; k+=1) {
-	//	printf("Frame %d => page %d\n", pageTable[k].page, pageTable[k].index);
-	//}
-	//printf("\n");
-
+	int n;
+	bool found;
+	printf("Contents of page frames: \n");
+	for (k=0; k<FRAMES; k+=1) {
+		found = false;
+		for (n=0; n<PAGE_TABLE; n+=1) {
+			if ((k == pageTable[n].page) && pageTable[n].inmem) {
+				printf("Frame %d => page %d\n", k, pageTable[n].index);
+				found = true;
+			}
+		}
+		if (found == false) {
+			printf("Frame %d => empty\n", k);
+		} 
+	}
+	printf("\n");
+	
 	double pageTableFaultRate = fault/total;
 	double tlbHitRate = tlbHits/total;	
 	printf("Page fault rate: %f hits/reference\n", pageTableFaultRate);
