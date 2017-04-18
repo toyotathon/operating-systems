@@ -23,4 +23,6 @@
 - program will read in a file that represents logical addresses
   - will handle address translation, page faults, etc
 
+### Project 4  
+- implement a file system on top of a virtual disk
 
