@@ -1,2 +1,2 @@
-all: filesystem.c
-	gcc -Wall myApp.c disk.c filesystem.c -o filesystem 
+all: fileManager.c
+	gcc -Wall myApp.c disk.c fileManager.c -o fileManager 
