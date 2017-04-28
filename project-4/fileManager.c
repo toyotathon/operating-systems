@@ -10,35 +10,41 @@
 
 /* Structs needed to implement filesystem */
 typedef struct {
-	char *status;
-	char *bn;
-	char *fn;
-	char *len;
+	char status[2];
+	char bn[3];
+	char fn[5];
+	char len[4];
 } directoryBlock;
 
 typedef struct {
-	char *status1;
-	char *block1;
-	char *status2;
-	char *block2;
-	char *status3;
-	char *block3;
-	char *status4;
-	char *block4;
+	char status1[2];
+	char block1[5];
+	char status2[2];
+	char block2[5];
+	char status3[2];
+	char block3[5];
+	char status4[2];
+	char block4[5];
 } fatBlock;
-
-// TODO
-typedef struct {
-
-} oftBlock;
 
 directoryBlock newDirectoryBlock(char s[1], char bn[2], char fn[4], char len[3]) {
 	directoryBlock db;
+	
+	size_t ssize = sizeof(db.status);
+	strncpy(db.status, s, ssize);
+	db.status[ssize-1] = '\0';
 
-	db.status = s;
-	db.bn = bn;
-	db.fn = fn;
-	db.len = len;
+	size_t bnsize = sizeof(db.bn);
+	strncpy(db.bn, bn, bnsize);
+	db.bn[bnsize-1] = '\0';
+
+	size_t fnsize = sizeof(db.fn);
+	strncpy(db.fn, fn, fnsize);
+	db.fn[fnsize-1] = '\0';
+
+	size_t lensize = sizeof(db.len);
+	strncpy(db.len, len, lensize);
+	db.len[lensize-1] = '\0';
 
 	return db;
 }
@@ -46,17 +52,37 @@ directoryBlock newDirectoryBlock(char s[1], char bn[2], char fn[4], char len[3])
 fatBlock newFATBlock(char s1[1],char b1[3],char s2[1],char b2[3],char s3[1],char b3[3],char s4[1],char b4[3]) {
 	fatBlock f;
 
-	f.status1 	= s1;
-	f.block1 	= b1;
+	size_t s1size = sizeof(f.status1);
+	strncpy(f.status1, s1, s1size);
+	f.status1[s1size-1] = '\0';
+	
+	size_t b1size = sizeof(f.block1);
+	strncpy(f.block1, b1, b1size);
+	f.block1[b1size-1] = '\0';
 
-	f.status2 	= s2;
-	f.block2 	= b2;
+	size_t s2size = sizeof(f.status2);
+	strncpy(f.status2, s2, s2size);
+	f.status2[s2size-1] = '\0';
+	
+	size_t b2size = sizeof(f.block2);
+	strncpy(f.block2, b2, b2size);
+	f.block2[b2size-1] = '\0';
 
-	f.status3 	= s3;
-	f.block3 	= b3;
+	size_t s3size = sizeof(f.status3);
+	strncpy(f.status3, s3, s3size);
+	f.status3[s3size-1] = '\0';
+	
+	size_t b3size = sizeof(f.block3);
+	strncpy(f.block3, b3, b3size);
+	f.block3[b3size-1] = '\0';
 
-	f.status4 	= s4;
-	f.block4 	= b4;
+	size_t s4size = sizeof(f.status4);
+	strncpy(f.status4, s4, s4size);
+	f.status4[s4size-1] = '\0';
+	
+	size_t b4size = sizeof(f.block4);
+	strncpy(f.block4, b4, b4size);
+	f.block4[b4size-1] = '\0';
 
 	return f;
 }
@@ -64,6 +90,7 @@ fatBlock newFATBlock(char s1[1],char b1[3],char s2[1],char b2[3],char s3[1],char
 /* global memory arrays */
 directoryBlock directory[DIR_LENGTH];
 fatBlock fat[FAT_LENGTH];
+char OFT[4][4];
 
 int make_fs(char *disk_name) {
 	int new_disk = make_disk(disk_name);
@@ -86,22 +113,21 @@ int make_fs(char *disk_name) {
 	/* initializing directory */
 	int i;
  	for (i=1; i<9; i++) {
-		char directory[BLOCK_SIZE] = 
-			{'f', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' '};	
+		char directory[BLOCK_SIZE] = {'f', '/', '/', '/', '/', '/', '/', '/', '/', '/'};
 		block_write(i, directory);
 	}
 
 	/* initializing FAT */
 	for (i=9; i<17; i++) {
 		char fat[BLOCK_SIZE] = 
-			{'f', ' ', ' ', ' ', 'f', ' ', ' ', ' ', 'f', ' ', ' ', ' ', 'f', ' ', ' ', ' '};	
+			{'.', '/', '/', '/', '.', '/', '/', '/', '.', '/', '/', '/', '.', '/', '/', '/'};	
 		block_write(i, fat);
 	}
 	
 	/* initializing data */
 	for (i=32; i<64; i++) {
 		char data[BLOCK_SIZE] = 
-			{'f', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' '};	
+			{'.', '/', '/', '/', '/', '/', '/', '/', '/', '/', '/', '/', '/', '/', '/', '/'};	
 		block_write(i, data);
 	}
 
@@ -119,87 +145,61 @@ int mount_fs(char *disk_name) {
 	int i;
 	for (i=1; i<9; i++) {
 		char temp[BLOCK_SIZE];
-		char s[1];
-		char bn[2];
-		char fn[4];
-		char len[3];
 
 		/* read in directory block from memory */
-		block_read(i, temp);	
+		block_read(i, temp);
 
 		/* read status of block */
-		s[0] = temp[0];
+		char s[] = {temp[0], 0};
 
-		/* read block number of block */	
-		bn[0] = temp[1];
-		bn[1] = temp[2];
+		/* read block number of block */
+		char bn[] = {temp[1], temp[2], 0};
 
 		/* read file number of block */	
-		fn[0] = temp[3];
-		fn[1] = temp[4];
-		fn[2] = temp[5];
-		fn[3] = temp[6];
+		char fn[] = {temp[3], temp[4], temp[5], temp[6], 0};
 
 		/* read length of file */
-		len[0] = temp[7];	
-		len[1] = temp[8];
-		len[2] = temp[9];	
+		char len[] = {temp[7], temp[8], temp[9], 0};
 		
+		/* save data to directory struct */
 		int save = i-1;	
 		directory[save] = newDirectoryBlock(s, bn, fn, len);
 	}
-	
+
+	/* read in FAT data */	
 	int save = 0;
 	for (i=9; i<17; i++) {
-		char temp[BLOCK_SIZE];
-		char s1[1];
-		char b1[3];
-
-		char s2[1];
-		char b2[3];
-
-		char s3[1];
-		char b3[3];
-
-		char s4[1];
-		char b4[3];	
-		
+		char temp[BLOCK_SIZE];	
 		block_read(i, temp);
-		printf("block %d data: %s\n", i, temp);	
 	
-		s1[0] = temp[0];
-		b1[0] = temp[1];
-		b1[1] = temp[2];
-		b1[2] = temp[3];
-		printf("block 1 status: %s\n", s1);
-		printf("block 1 content: %s\n", b1);
+		/* read in block 1 data */
+		char s1[] = {temp[0], 0};
+		char b1[] = {temp[1], temp[2], temp[3], 0};
 
-		s2[0] = temp[4];
-		b2[0] = temp[5];
-		b2[1] = temp[6];
-		b2[2] = temp[7];
-		printf("block 2 status: %s\n", s2);
-		printf("block 2 content: %s\n", b2);
+		/* read in block 2 data */
+		char s2[] = {temp[4], 0};
+		char b2[] = {temp[5], temp[6], temp[7], 0};
 
-		s3[0] = temp[8];
-		b3[0] = temp[9];
-		b3[1] = temp[10];
-		b3[2] = temp[11];
-		printf("block 3 status: %s\n", s3);
-		printf("block 3 content: %s\n", b3);
+		/* read in block 3 data */
+		char s3[] = {temp[8], 0};
+		char b3[] = {temp[9], temp[10], temp[11], 0};
 
-		s4[0] = temp[12];
-		b4[0] = temp[13];
-		b4[1] = temp[14];
-		b4[2] = temp[15];
-		printf("block 4 status: %s\n", s4);
-		printf("block 4 content: %s\n", b4);
+		/* read in block 4 data */
+		char s4[] = {temp[12], 0};
+		char b4[] =	{temp[13], temp[14], temp[15], 0};
 
+		/* save data to FAT struct */
 		fat[save] = newFATBlock(s1,b1,s2,b2,s3,b3,s4,b4);
-		printf("index: %d\n", save);
+
 		save++;	
 	}
-	return 1;
+
+	/* initialize OFT values, set open flags */
+	for (i=0; i<4; i++) {
+		OFT[i][0] = '.';
+	}
+	
+	return 0;
 }
 
 int dismount_fs(char *disk_name) {return 1;}
