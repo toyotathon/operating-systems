@@ -131,7 +131,7 @@ int make_fs(char *disk_name) {
 		block_write(i, data);
 	}
 
-		close_disk();
+	close_disk();
 	return 0;
 }
 
@@ -198,11 +198,42 @@ int mount_fs(char *disk_name) {
 	for (i=0; i<4; i++) {
 		OFT[i][0] = '.';
 	}
-	
+
+	close_disk();
 	return 0;
 }
 
-int dismount_fs(char *disk_name) {return 1;}
+int dismount_fs(char *disk_name) {	
+	open_disk(disk_name);
+
+	/* load directory metadata back into disk */
+	int i;
+	for (i=0; i<DIR_LENGTH; i++) {
+		directoryBlock dir = directory[i];
+		char temp[BLOCK_SIZE];
+		
+		temp[0] = dir.status[0];
+		
+		temp[1] = dir.bn[0];
+		temp[2] = dir.bn[1];
+
+		temp[3] = dir.fn[0];
+		temp[4] = dir.fn[1];
+		temp[5] = dir.fn[2];
+		temp[6] = dir.fn[3];
+		
+		temp[7] = dir.len[0];
+		temp[8] = dir.len[1];
+		temp[9] = dir.len[2];
+
+		//printf("%s\n", temp);
+		int save = i+1;
+		block_write(save, temp);
+	}
+
+	close_disk();
+	return 1;
+}
 
 int fs_create(char *name) {return 1;}
 
