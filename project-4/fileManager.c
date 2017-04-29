@@ -1,5 +1,6 @@
 #include <stddef.h>
 #include <stdio.h>
+#include <stdbool.h>
 #include <string.h>
 
 #include "disk.h"
@@ -90,7 +91,8 @@ fatBlock newFATBlock(char s1[1],char b1[3],char s2[1],char b2[3],char s3[1],char
 /* global memory arrays */
 directoryBlock directory[DIR_LENGTH];
 fatBlock fat[FAT_LENGTH];
-char OFT[4][4];
+char oft[4][4];
+bool freeDirectory[DIR_LENGTH];
 
 int make_fs(char *disk_name) {
 	int new_disk = make_disk(disk_name);
@@ -113,21 +115,24 @@ int make_fs(char *disk_name) {
 	/* initializing directory */
 	int i;
  	for (i=1; i<9; i++) {
-		char directory[BLOCK_SIZE] = {'f', '/', '/', '/', '/', '/', '/', '/', '/', '/'};
+		char directory[BLOCK_SIZE] = {'f', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0'};
 		block_write(i, directory);
 	}
 
 	/* initializing FAT */
 	for (i=9; i<17; i++) {
 		char fat[BLOCK_SIZE] = 
-			{'.', '/', '/', '/', '.', '/', '/', '/', '.', '/', '/', '/', '.', '/', '/', '/'};	
+			{'.', '\0', '\0', '\0',
+			 '.', '\0', '\0', '\0', 
+			 '.', '\0', '\0', '\0', 
+			 '.', '\0', '\0', '\0'};	
 		block_write(i, fat);
 	}
 	
 	/* initializing data */
 	for (i=32; i<64; i++) {
-		char data[BLOCK_SIZE] = 
-			{'.', '/', '/', '/', '/', '/', '/', '/', '/', '/', '/', '/', '/', '/', '/', '/'};	
+		char data[BLOCK_SIZE] = 		
+		{'.', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0'};	
 		block_write(i, data);
 	}
 
@@ -196,7 +201,7 @@ int mount_fs(char *disk_name) {
 
 	/* initialize OFT values, set open flags */
 	for (i=0; i<4; i++) {
-		OFT[i][0] = '.';
+		oft[i][0] = '.';
 	}
 
 	close_disk();
@@ -210,7 +215,7 @@ int dismount_fs(char *disk_name) {
 	int i;
 	for (i=0; i<DIR_LENGTH; i++) {
 		directoryBlock dir = directory[i];
-		char temp[BLOCK_SIZE];
+		char temp[BLOCK_SIZE];	
 		
 		temp[0] = dir.status[0];
 		
@@ -226,18 +231,109 @@ int dismount_fs(char *disk_name) {
 		temp[8] = dir.len[1];
 		temp[9] = dir.len[2];
 
-		//printf("%s\n", temp);
+		temp[10] = '\0';
+		temp[11] = '\0';
+		temp[12] = '\0';
+		temp[13] = '\0';
+		temp[14] = '\0';
+		temp[15] = '\0';
+	
 		int save = i+1;
 		block_write(save, temp);
 	}
+	
+	int save = 0;
+	for (i=9; i<17; i++) {
+		fatBlock f = fat[save];
+		char temp[BLOCK_SIZE+1];
+		
+		temp[0] 	= f.status1[0];
+		temp[1] 	= f.block1[0];
+		temp[2] 	= f.block1[1];
+		temp[3] 	= f.block1[2];
+
+		temp[4] 	= f.status2[0];
+		temp[5] 	= f.block2[0];
+		temp[6] 	= f.block2[1];
+		temp[7] 	= f.block2[2];
+
+		temp[8] 	= f.status3[0];
+		temp[9] 	= f.block3[0];
+		temp[10] 	= f.block3[1];
+		temp[11] 	= f.block3[2];
+	
+		temp[12] 	= f.status4[0];
+		temp[13]  	= f.block4[0];
+		temp[14]  	= f.block4[1];
+		temp[15]  	= f.block4[2];
+
+		temp[BLOCK_SIZE] = '\0';
+		
+		block_write(i, temp);
+		save += 1;
+	}
+
+	/* TODO ANY OTHER METADATA TO SAVE GETS WRITTEN HERE */
 
 	close_disk();
 	return 1;
 }
 
-int fs_create(char *name) {return 1;}
+int fs_create(char *name) {
+	int i;
+	int length = 0;	
 
-int fs_open(char *name) {return 1;}
+	/* get file name length */
+	for(i=0; name[i]!='\0'; i++) {
+		name[i];
+		length += 1;
+	}
+	
+	if (length > 4) {
+		return -1;
+	}
+
+	/* check that this file name isnt already in use */
+	for (i=0; i<DIR_LENGTH; i++) {
+		directoryBlock curr = directory[i];
+		char *currfn = curr.fn;
+		if (strcmp(currfn, name) == 0) {
+			printf("filename in use\n");
+			return -1;
+		}
+	}
+
+	/* both tests pass -> create a new file. check to see if it has been allocated first */
+	char free[] = {'f', '\0'};
+	char *temp = free;
+	int count = 1;
+	int dirindex;
+	for (i=0; i<DIR_LENGTH; i++) {
+		/* check to see if block has been allocated */
+		if (strcmp(directory[i].status, temp) == 0) {
+			directory[i].status[0] = 'a';
+			directory[i].status[1] = '\0';
+			dirindex = i;
+			break;
+		}
+		count += 1;
+	}
+	
+	/* if there isnt a free file */	
+	if (count == DIR_LENGTH) {
+		return -1;
+	}
+
+	for (i=0; i<length; i++) {
+		directory[dirindex].fn[i] =	name[i];
+	} 
+		
+	return 0;
+}
+
+int fs_open(char *name) {
+	return 1;
+}
 
 int fs_close(int fildes) {return 1;}
 
