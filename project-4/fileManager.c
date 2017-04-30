@@ -1,6 +1,7 @@
 #include <stddef.h>
 #include <stdio.h>
 #include <stdbool.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "disk.h"
@@ -27,6 +28,12 @@ typedef struct {
 	char status4[2];
 	char block4[5];
 } fatBlock;
+
+typedef struct {
+	bool open;
+	char *filename;
+	int offset;
+} oftBlock;
 
 directoryBlock newDirectoryBlock(char s[1], char bn[2], char fn[4], char len[3]) {
 	directoryBlock db;
@@ -88,11 +95,24 @@ fatBlock newFATBlock(char s1[1],char b1[3],char s2[1],char b2[3],char s3[1],char
 	return f;
 }
 
-/* global memory arrays */
+oftBlock newOFTBlock() {
+	oftBlock oft;
+	
+	oft.open = true;
+	oft.filename = malloc(10);
+	oft.offset = 0;
+	
+	return oft;
+}
+
+/* global filesystem arrays */
 directoryBlock directory[DIR_LENGTH];
 fatBlock fat[FAT_LENGTH];
-char oft[4][4];
+oftBlock oft[4]; 
 bool freeDirectory[DIR_LENGTH];
+
+/*MOVED FOR TESTING*/
+//{'\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0'};
 
 int make_fs(char *disk_name) {
 	int new_disk = make_disk(disk_name);
@@ -122,17 +142,17 @@ int make_fs(char *disk_name) {
 	/* initializing FAT */
 	for (i=9; i<17; i++) {
 		char fat[BLOCK_SIZE] = 
-			{'.', '\0', '\0', '\0',
-			 '.', '\0', '\0', '\0', 
-			 '.', '\0', '\0', '\0', 
-			 '.', '\0', '\0', '\0'};	
+			{'f', '\0', '\0', '\0',
+			 'f', '\0', '\0', '\0', 
+			 'f', '\0', '\0', '\0', 
+			 'f', '\0', '\0', '\0'};	
 		block_write(i, fat);
 	}
 	
 	/* initializing data */
 	for (i=32; i<64; i++) {
-		char data[BLOCK_SIZE] = 		
-		{'.', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0'};	
+		char data[BLOCK_SIZE] =	
+		{'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p'};	
 		block_write(i, data);
 	}
 
@@ -199,9 +219,9 @@ int mount_fs(char *disk_name) {
 		save++;	
 	}
 
-	/* initialize OFT values, set open flags */
+	/* initialize OFT values, set open flags */	
 	for (i=0; i<4; i++) {
-		oft[i][0] = '.';
+		oft[i] = newOFTBlock();
 	}
 
 	close_disk();
@@ -276,7 +296,7 @@ int dismount_fs(char *disk_name) {
 	/* TODO ANY OTHER METADATA TO SAVE GETS WRITTEN HERE */
 
 	close_disk();
-	return 1;
+	return 0;
 }
 
 int fs_create(char *name) {
@@ -297,8 +317,7 @@ int fs_create(char *name) {
 	for (i=0; i<DIR_LENGTH; i++) {
 		directoryBlock curr = directory[i];
 		char *currfn = curr.fn;
-		if (strcmp(currfn, name) == 0) {
-			printf("filename in use\n");
+		if (strcmp(currfn, name) == 0) {	
 			return -1;
 		}
 	}
@@ -332,21 +351,188 @@ int fs_create(char *name) {
 }
 
 int fs_open(char *name) {
-	return 1;
+	int i;
+	bool notfound;
+	bool nospace;
+	int filedes;
+
+	/* check if name exists in directory first */
+	notfound = true;	
+	for (i=0; i< DIR_LENGTH; i++) {
+		directoryBlock curr = directory[i];
+		if (strcmp(curr.fn, name) == 0) {
+			notfound = false;
+			break;	
+		}
+	}
+	if (notfound) {
+		return -1;
+	}
+
+	/* check if file is already open in OFT */
+	for (i=0; i<4; i++) {
+		oftBlock curr = oft[i];
+		if (strcmp(curr.filename, name) == 0) {
+			return -1;
+		} 
+	}
+
+	/* check if there is room in the OFT */
+	nospace = true;
+	for (i=0; i<4; i++) {
+		if (oft[i].open) {
+			int size = sizeof(oft[i].filename);
+			strncpy(oft[i].filename, name, size);
+			filedes = i;
+			oft[i].open = false;
+			nospace = false;
+			break;	
+		}
+	}
+	if (nospace) {
+		return -1;
+	}
+
+	return filedes;
+}
+	
+int fs_close(int fildes) {
+	char null[] = {'\0'};
+	if (oft[fildes].open) {
+		return -1;
+	}	
+
+	oft[fildes].open = true;
+	int size = sizeof(oft[fildes].filename);
+	strncpy(oft[fildes].filename, null, size);
+	oft[fildes].offset = 0;	
+	
+	return 0;
 }
 
-int fs_close(int fildes) {return 1;}
+int fs_delete(char *name) {
+	int i;
+	/* check if the file is open first */
+	for (i=0; i<4; i++) {
+		if (strcmp(oft[i].filename, name) == 0) {
+			return -1;
+		}
+	}
 
-int fs_delete(char *name) {return 1;}
+	/* find the directory to delete */
+	int deleteindex;
+	int count = 1;
+	for (i=0; i<DIR_LENGTH; i++) {
+		if (strcmp(directory[i].fn, name) == 0) {
+			deleteindex = i;
+			break;
+		}
+		count += 1;
+	}
+	/* file does not exist in directory */
+	if (count == DIR_LENGTH) {
+		return -1;
+	}
 
-int fs_read(int fildes, void *buf, size_t nbyte) {return 1;}
+	/* reset values in block */	
+	directory[deleteindex].status[0] = 'f';
+	
+	directory[deleteindex].bn[0] = '\0'; 
+	directory[deleteindex].bn[1] = '\0';
+	
+	directory[deleteindex].fn[0] = '\0';
+	directory[deleteindex].fn[1] = '\0';
+	directory[deleteindex].fn[2] = '\0';
+	directory[deleteindex].fn[3] = '\0';
 
+	directory[deleteindex].len[0] = '\0';
+	directory[deleteindex].len[1] = '\0';
+	directory[deleteindex].len[2] = '\0';
+	
+	return 0;
+}
+
+//TODO
+int fs_read(int fildes, void *buf, size_t nbyte) {
+	/*
+	int i;
+	int blocks;
+	int bytes;
+	int offset;
+	int oblocks;
+	int obytes;
+	int read;
+	directoryBlock dir;
+	*/
+	/* check if file is open first */
+	/*
+	if (oft[fildes].open) {
+		return -1;
+	}
+	*/
+
+	/* get directory block information*/
+	/*
+	char *filename = oft[fildes].filename;
+	printf("filename: %s\n", filename);
+	*/
+	/*
+	for (i=0; i<DIR_LENGTH; i++) {	
+		if (strcmp(directory[i].fn, filename) == 0) {
+			break;
+		}	
+	} 
+	*/
+	//printf("%d\n", i);
+
+	/* get number of blocks to be read */
+	/*
+	blocks = (int) nbyte / 16;
+	bytes = (int) nbyte % 16;
+	*/
+
+	/* bytes to read in context to offset pointer */
+	/*
+	offset = oft[fildes].offset;
+	read = nbyte - offset;
+	oblocks = offset / 16;
+	obytes = offset % 16; 
+	*/
+
+	return 1;
+}
+//TODO
 int fs_write(int filedes, void *buff, size_t nbyte) {return 1;}
 
-int fs_get_filesize(int fildes) {return 1;}
+//TODO
+int fs_get_filesize(int fildes) {
+	int i;
+	int length;
 
+	/* make sure file being requested is valid in OFT */
+	if (oft[fildes].open) {
+		return -1;
+	}
+	
+	/* get filename */	
+	char *filename = oft[fildes].filename;
+	for (i=0; i<DIR_LENGTH; i++) {
+		directoryBlock curr = directory[i];
+		if (strcmp(curr.fn, filename) == 0) {
+			char *temp = curr.len;
+			length = (int) strtol(temp, (char **)NULL, 10);
+			return length;
+		}
+	}
+
+	/* if this is reached, another error occured */
+	return -1;
+}
+
+//TODO
 int fs_lseek(int fildes, off_t offset) {return 1;}
 
+//TODO
 int fs_truncate(int fildes, off_t length) {return 1;}
 
 
