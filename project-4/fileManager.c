@@ -502,9 +502,11 @@ int fs_read(int fildes, void *buf, size_t nbyte) {
 	return 1;
 }
 //TODO
-int fs_write(int filedes, void *buff, size_t nbyte) {return 1;}
+int fs_write(int filedes, void *buff, size_t nbyte) {
+	return 1;
+}
 
-//TODO
+
 int fs_get_filesize(int fildes) {
 	int i;
 	int length;
@@ -530,7 +532,52 @@ int fs_get_filesize(int fildes) {
 }
 
 //TODO
-int fs_lseek(int fildes, off_t offset) {return 1;}
+int fs_lseek(int fildes, off_t offset) {
+	int i;
+	directoryBlock dir;
+	int filelength;
+	int curroffset;
+	int newoffset;
+	int temp;
+	char *temp1;
+
+	/* check file to see if it is in the OFT */
+	if (oft[fildes].open) {
+		return -1;
+	}
+	
+	/* get corresponding directory */
+	char *filename = oft[fildes].filename;
+	for (i=0; i<DIR_LENGTH; i++) {
+		if (strcmp(directory[i].fn, filename) == 0) {
+			dir = directory[i];
+		}
+	}
+	
+	/* get length from the dir block; need to convert from string */
+	temp1 = dir.len;
+	filelength = (int) strtol(temp1, (char **)NULL, 10);
+
+	/* get the new offset, current offset, file length */
+	curroffset = oft[fildes].offset;
+	temp = (int) curroffset	+ offset;
+
+	/* do out of bounds checks */	
+	if (temp < 0) {
+		/* trying to point before beginning */
+		return -1;
+	}
+
+	if (temp > filelength) {
+		/* trying to point after the end of file */
+		return -1;
+	}
+
+	newoffset = temp;
+	oft[fildes].offset = newoffset;	
+	return 0;
+}
+
 
 //TODO
 int fs_truncate(int fildes, off_t length) {return 1;}
