@@ -335,7 +335,6 @@ int dismount_fs(char *disk_name) {
 		block_write(i, disk[save]);
 		save += 1;
 	}
-
 	/* TODO ANY OTHER METADATA TO SAVE GETS WRITTEN HERE */
 
 	close_disk();
@@ -698,16 +697,10 @@ int fs_write(int fildes, void *buff, size_t nbyte) {
 	/* save new offset and length data to memory */
 	oft[fildes].offset = offset;
 	char *finlen = malloc(3);
-	snprintf(finlen, 3, "%d", length);
-	for (i=0; i<DIR_LENGTH; i++) {
-		if (strcmp(dir.fn, directory[i].fn) == 0) {
-			strcpy(directory[i].len, finlen);
-		}
-	}
-
-
+	snprintf(finlen, 3, "%d", (int) nbyte);	
+	strcpy(directory[dirindex].len, finlen);	
 	
-	return length;
+	return nbyte;
 }
 
 
@@ -783,11 +776,14 @@ int fs_lseek(int fildes, off_t offset) {
 	return 0;
 }
 
-// TODO
 int fs_truncate(int fildes, off_t length) {
 	int i;
-	int dirindex;
-	directoryBlock dir;
+	int len;
+	int blocknumber;
+	int blocknumber1;
+	int blocksneeded;
+	int fatsneeded;
+	directoryBlock dir;	
 
 	if (oft[fildes].open) {
 		return -1;
@@ -798,12 +794,46 @@ int fs_truncate(int fildes, off_t length) {
 	for (i=0; i<DIR_LENGTH; i++) {
 		if (strcmp(directory[i].fn, filename) == 0) {
 			dir = directory[i];
-			dirindex = i;
 		}
 	}
+	char *templen = dir.len;
+	char *tempbn = dir.bn;
+	blocknumber = (int) strtol(tempbn, (char **)NULL, 10);
+	blocknumber1 = blocknumber;	
+	len = (int) strtol(templen, (char **)NULL, 10);
 
+	/* check if truncating length is greater than size of file */
+	if (len < length) {
+		return -1;
+	}
 
-	return 1;
+	/* read through entire file, hold in temp buffer */
+	blocksneeded = (int) (length / 16) + 1;
+	fatsneeded = (int) (blocksneeded / 4) + 1;
+	
+	char *temphold = malloc(len);
+	for (i=0; i<fatsneeded; i++) {
+		char *tempiter = malloc(BLOCK_SIZE);
+		strcpy(tempiter, disk[blocknumber]);
+		strcat(temphold, tempiter);
+		blocknumber += 1;
+	}
+
+	for (i=length; i< len; i++) {
+		temphold[i] = '\0';
+	}
+	
+	int j;
+	int temp = 0;
+	for (i=0; i<fatsneeded; i++) {
+		for (j=0; j<BLOCK_SIZE; j++) {
+			disk[blocknumber1][j] = temphold[temp];
+			temp += 1;
+			if (temphold[j] == '\0') break;
+		}
+		blocknumber1 += 1;
+	}
+	return 0;
 }
 
 
