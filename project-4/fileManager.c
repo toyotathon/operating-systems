@@ -109,7 +109,27 @@ oftBlock newOFTBlock() {
 directoryBlock directory[DIR_LENGTH];
 fatBlock fat[FAT_LENGTH];
 oftBlock oft[4]; 
-bool freeDirectory[DIR_LENGTH];
+char disk[32][16];
+
+void fatBlockNumbers() {
+	int i;
+	int value = 0;	
+	for(i=0; i<16; i++) {
+		char temp[3];
+		snprintf(temp, 3, "%d", value);
+		strncpy(fat[i].block1, temp, 3);
+		char temp1[3];
+		snprintf(temp1, 3, "%d", value+1);
+		strncpy(fat[i].block2, temp1, 3);
+		char temp2[3];
+		snprintf(temp2, 3, "%d", value+2);
+		strncpy(fat[i].block3, temp2, 3);
+		char temp3[3];
+		snprintf(temp3, 3, "%d", value+3);
+		strncpy(fat[i].block4, temp3, 3);
+		value += 4;
+	}
+}
 
 /*MOVED FOR TESTING*/
 //{'\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0'};
@@ -152,7 +172,8 @@ int make_fs(char *disk_name) {
 	/* initializing data */
 	for (i=32; i<64; i++) {
 		char data[BLOCK_SIZE] =	
-		{'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p'};	
+		{'\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0'};
+	
 		block_write(i, data);
 	}
 
@@ -218,6 +239,7 @@ int mount_fs(char *disk_name) {
 
 		save++;	
 	}
+	fatBlockNumbers();
 
 	/* initialize OFT values, set open flags */	
 	for (i=0; i<4; i++) {
@@ -290,6 +312,12 @@ int dismount_fs(char *disk_name) {
 		temp[BLOCK_SIZE] = '\0';
 		
 		block_write(i, temp);
+		save += 1;
+	}
+		
+	save = 0;
+	for (i=32; i<64; i++) {
+		block_write(i, disk[save]);
 		save += 1;
 	}
 
@@ -454,56 +482,230 @@ int fs_delete(char *name) {
 
 //TODO
 int fs_read(int fildes, void *buf, size_t nbyte) {
-	/*
 	int i;
-	int blocks;
-	int bytes;
 	int offset;
-	int oblocks;
-	int obytes;
+	int blocknumber;
+	int length;
+	int blocks;
 	int read;
 	directoryBlock dir;
-	*/
+	
 	/* check if file is open first */
-	/*
 	if (oft[fildes].open) {
 		return -1;
 	}
-	*/
 
 	/* get directory block information*/
-	/*
 	char *filename = oft[fildes].filename;
-	printf("filename: %s\n", filename);
-	*/
-	/*
+
 	for (i=0; i<DIR_LENGTH; i++) {	
 		if (strcmp(directory[i].fn, filename) == 0) {
+			dir = directory[i];
 			break;
 		}	
 	} 
-	*/
-	//printf("%d\n", i);
-
-	/* get number of blocks to be read */
-	/*
-	blocks = (int) nbyte / 16;
-	bytes = (int) nbyte % 16;
-	*/
-
-	/* bytes to read in context to offset pointer */
-	/*
+	
+	/* get relevant metadata from directory, convert to int */
+	char* tempbn = dir.bn;
+	blocknumber = (int) strtol(tempbn, (char **)NULL, 10);
+	//printf("block number: %d\n", blocknumber);
+	char* templen = dir.len;
+	length = (int) strtol(templen, (char **)NULL, 10);
+	//printf("length: %d\n", length);
+	
+	/* get relavant metadata for offset pointer */
 	offset = oft[fildes].offset;
-	read = nbyte - offset;
-	oblocks = offset / 16;
-	obytes = offset % 16; 
+	
+	/* number of data blocks to be read */
+	if (length < nbyte) {
+		read = length;
+	} else {
+		read = nbyte;
+	}
+
+	/* 
+	idea: 
+		1. read all data from beginning to end block in FAT
+			- hold it in a temp char array
+			- char array allocated with 512 bytes (max length of file)
+		2. load data from temp array starting at offset into void *
 	*/
 
-	return 1;
+	return read;
 }
 //TODO
-int fs_write(int filedes, void *buff, size_t nbyte) {
-	return 1;
+int fs_write(int fildes, void *buff, size_t nbyte) {
+	int i, blocknumber, length;
+	directoryBlock dir;
+	
+	/* check if file is open first */
+	if (oft[fildes].open) {
+		return -1;
+	}
+
+	/* get directory block information*/
+	char *filename = oft[fildes].filename;
+
+	for (i=0; i<DIR_LENGTH; i++) {	
+		if (strcmp(directory[i].fn, filename) == 0) {
+			dir = directory[i];
+			break;
+		}	
+	}
+	char null[] = {'\0', '\0'};
+	char null1[] = {'\0', '\0', '\0'};
+	char *tempbn = dir.bn;
+	char *templen = dir.len;
+	int nobn = (strcmp(tempbn, null) == 0);
+	int nolen = (strcmp(templen, null1) == 0);
+	
+	char *newbn = malloc(3);
+	/* if there hasnt been any data written to this file (i.e. was recently created)*/
+	if (nobn && nolen) {
+		// find an open FAT block to enter
+		for (i=0; i<16; i++) {
+			char free[] = {'f', '\0'};
+			char alloc[] = {'a', '\0'};
+			char *status1 = fat[i].status1;	
+			char *status2 = fat[i].status2;	
+			char *status3 = fat[i].status3;	
+			char *status4 = fat[i].status4;
+			
+			if (strcmp(status1, free) == 0) {
+				strcpy(fat[i].status1, alloc);
+				strcpy(newbn, fat[i].block1);
+				break;
+			}
+			if (strcmp(status2, free) == 0) {
+				strcpy(fat[i].status2, alloc);	
+				strcpy(newbn, fat[i].block2);
+				break;
+			}
+			
+			if (strcmp(status3, free) == 0) {
+				strcpy(fat[i].status3, alloc);
+				strcpy(newbn, fat[i].block3);
+				break;
+			}
+			
+			if (strcmp(status4, free) == 0) {
+				strcpy(fat[i].status4, alloc);
+				strcpy(newbn, fat[i].block4);
+				break;
+			}
+		}
+		
+		for (i=0; i<DIR_LENGTH; i++) {
+			if (strcmp(dir.fn, directory[i].fn) == 0) {
+				strcpy(directory[i].bn, newbn);
+			}
+		}	
+		blocknumber = strtol(newbn, (char **)NULL, 10);
+		length = 0;
+
+	} else {
+		blocknumber = strtol(tempbn, (char **)NULL, 10);
+		length = strtol(templen, (char **)NULL, 10);
+	}
+
+	/* now that we have first block, figure out how many more are needed */	
+	int blocksneeded;
+	int fatsneeded;
+	int offset = 0;
+	blocksneeded = (int) (nbyte / 16) + 1;
+	fatsneeded = (int) (blocksneeded / 4) + 1;
+
+	char *buffer = (char *)buff;
+	
+	for (i=0; i<fatsneeded; i++) {
+		/* get data to write to disk */
+		int j;
+		char alloc[] = {'a', '\0'};
+		if (blocksneeded != 0) {
+			char *tempbuff = malloc(16);
+			strcpy(fat[blocknumber].status1, alloc);
+			for (j=0; j<BLOCK_SIZE; j++) {
+				if (buffer[offset] != '\0') {
+					tempbuff[j] = buffer[offset];
+					offset += 1;
+					length += 1;
+				} else break;
+			}
+			
+			strcpy(disk[blocknumber], tempbuff);
+			printf("written: %s\n", disk[blocknumber]);
+	
+			blocksneeded -= 1;
+			blocknumber += 1;
+		} else break;
+
+		if (blocksneeded != 0) {
+			char *tempbuff = malloc(16);
+			strcpy(fat[blocknumber].status2, alloc);
+			for (j=0; j<BLOCK_SIZE; j++) {
+				if (buffer[offset] != '\0') {
+					tempbuff[j] = buffer[offset];
+					offset += 1;
+					length += 1;
+				} else break;
+			}
+			
+			strcpy(disk[blocknumber], tempbuff);
+			printf("written: %s\n", disk[blocknumber]);
+
+
+			blocksneeded -= 1;
+			blocknumber += 1;
+		} else break;
+
+		if (blocksneeded != 0) {
+			char *tempbuff = malloc(16);
+			strcpy(fat[blocknumber].status3, alloc);
+			for (j=0; j<BLOCK_SIZE; j++) {
+				if (buffer[offset] != '\0') {
+					tempbuff[j] = buffer[offset];
+					offset += 1;
+					length += 1;
+				} else break;
+			}
+			
+			strcpy(disk[blocknumber], tempbuff);
+			printf("written: %s\n", disk[blocknumber]);
+	
+			blocksneeded -= 1;
+			blocknumber += 1;
+		} else break; 
+
+		if (blocksneeded != 0) {
+			char *tempbuff = malloc(16);
+			strcpy(fat[blocknumber].status4, alloc);
+			for (j=0; j<BLOCK_SIZE; j++) {
+				if (buffer[offset] != '\0') {
+					tempbuff[j] = buffer[offset];
+					offset += 1;
+					length += 1;
+				} else break;
+			}
+			
+			strcpy(disk[blocknumber], tempbuff);
+			printf("written: %s\n", disk[blocknumber]);
+
+			blocksneeded -= 1;
+			blocknumber += 1;
+		} else break;	
+	}
+
+	/* save new offset and length data to memory */
+	oft[fildes].offset = offset;
+	char *finlen = malloc(3);
+	snprintf(finlen, 3, "%d", length);
+	for (i=0; i<DIR_LENGTH; i++) {
+		if (strcmp(dir.fn, directory[i].fn) == 0) {
+			strcpy(directory[i].len, finlen);
+		}
+	}
+	
+	return length;
 }
 
 
@@ -531,7 +733,6 @@ int fs_get_filesize(int fildes) {
 	return -1;
 }
 
-//TODO
 int fs_lseek(int fildes, off_t offset) {
 	int i;
 	directoryBlock dir;
