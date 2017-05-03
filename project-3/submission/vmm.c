@@ -346,4 +346,6 @@ int main(int argc, char *argv[]) {
 
 	fclose(addresses);
 	fclose(bs);
+	
+	return 0;
 }
